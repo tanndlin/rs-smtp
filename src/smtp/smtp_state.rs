@@ -1,20 +1,26 @@
-use crate::smtp::message::{ExtendedHello, Hello, Message, Response};
+use crate::smtp::{
+    mail::Mail,
+    message::{ExtendedHello, Hello, Message, Response},
+};
 
+#[derive(Default)]
 pub struct SMTPState {
     domain: Option<String>,
+    from: Option<String>,
 }
 
 impl SMTPState {
     pub fn new() -> Self {
-        Self { domain: None }
+        Self::default()
     }
 
     pub fn handle_message(&mut self, message: Message) -> Response {
         dbg!(&message);
 
         match message {
-            Message::HELO(helo) => self.handle_hello(helo),
-            Message::EHLO(ehlo) => self.handle_extended_hello(ehlo),
+            Message::Hello(helo) => self.handle_hello(helo),
+            Message::EHello(ehlo) => self.handle_extended_hello(ehlo),
+            Message::Mail(mail) => self.handle_mail(mail),
         }
     }
 
@@ -25,6 +31,11 @@ impl SMTPState {
 
     fn handle_hello(&mut self, helo: Hello) -> Response {
         self.domain = Some(helo.domain);
+        Response::Ok(())
+    }
+
+    fn handle_mail(&mut self, mail: Mail) -> Response {
+        self.from = Some(mail.from);
         Response::Ok(())
     }
 }

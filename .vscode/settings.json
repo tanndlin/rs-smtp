@@ -1,0 +1,20 @@
+{
+    "restoreTerminals.terminals": [
+        {
+            "splitTerminals": [
+                {
+                    "name": "Run",
+                    "commands": [
+                        "cargo watch -x 'run' -c"
+                    ]
+                },
+                {
+                    "name": "Git",
+                    "commands": [
+                        "git status",
+                    ]
+                }
+            ],
+        }
+    ],
+}
