@@ -49,9 +49,23 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
 
     loop {
         let message = line_parser.next_line().unwrap();
-        let command = Message::try_from(message).unwrap();
-        let response = state.handle_message(command);
+        dbg!(&message);
+        if !state.receiving_data {
+            let command = Message::try_from(message).unwrap();
+            let response = state.handle_message(command);
 
-        response.write_to(&mut stream).unwrap();
+            if matches!(response, Response::Closing(_)) {
+                response.write_to(&mut stream).unwrap();
+                break;
+            }
+
+            response.write_to(&mut stream).unwrap();
+        } else {
+            if let Some(res) = state.handle_data_content(message) {
+                res.write_to(&mut stream).unwrap();
+            }
+        }
     }
+
+    println!("Connection closed with peer: {addr}");
 }
