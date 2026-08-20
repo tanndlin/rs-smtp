@@ -45,14 +45,13 @@ fn listen(listener: TcpListener) {
 fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
     let mut state = SMTPState::new(handle_mail_received);
     let mut line_parser = LineParser::new(stream.try_clone().unwrap());
+    #[cfg(debug_assertions)]
     println!("Connected to client: {addr}");
 
     let ready = Response::Ready(Ready::new());
     ready.write_to(&mut stream).unwrap();
 
-    loop {
-        let message = line_parser.next_line().unwrap();
-        dbg!(&message);
+    while let Ok(message) = line_parser.next_line() {
         if !state.receiving_data {
             let command = Request::try_from(message).unwrap();
             let response = state.handle_message(command);
@@ -68,7 +67,8 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
         }
     }
 
-    println!("Connection closed with peer: {addr}");
+    #[cfg(debug_assertions)]
+    dbg!("Connection closed with peer: {addr}");
 }
 
 fn handle_mail_received(mail: String) {
@@ -80,7 +80,6 @@ fn handle_mail_received(mail: String) {
 
     let now = format!("{}.eml", Utc::now().format("%Y-%m-%dT%H-%M-%S%.9f"));
     let path = mail_dir.join(Path::new(&now));
-    dbg!(&path);
 
     fs::write(path, mail).unwrap();
 }

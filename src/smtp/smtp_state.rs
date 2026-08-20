@@ -44,8 +44,6 @@ impl SMTPState {
     }
 
     pub fn handle_message(&mut self, message: Request) -> Response {
-        dbg!(&message);
-
         match message {
             Request::Hello(helo) => self.handle_hello(helo),
             Request::EHello(ehlo) => self.handle_extended_hello(ehlo),

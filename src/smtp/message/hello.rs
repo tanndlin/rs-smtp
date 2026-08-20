@@ -5,8 +5,6 @@ pub struct HelloMessage {
 
 impl From<&str> for HelloMessage {
     fn from(value: &str) -> Self {
-        dbg!(&value);
-
         let domain = value.trim_end().to_string();
         Self { domain }
     }

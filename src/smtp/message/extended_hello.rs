@@ -5,8 +5,6 @@ pub struct ExtendedHelloMessage {
 
 impl From<&str> for ExtendedHelloMessage {
     fn from(value: &str) -> Self {
-        dbg!(&value);
-
         let domain = value.trim_end().to_string();
         Self { domain }
     }
