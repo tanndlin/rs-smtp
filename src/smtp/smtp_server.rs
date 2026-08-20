@@ -27,6 +27,11 @@ impl SMTPServer {
         println!("Listening on {addr}");
         let listen_thread = thread::spawn(|| listen(listener));
 
+        let mail_dir = Path::new("mail");
+        if !mail_dir.exists() {
+            fs::create_dir(mail_dir).unwrap();
+        }
+
         Ok(Self { listen_thread })
     }
 
@@ -72,12 +77,7 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
 }
 
 fn handle_mail_received(mail: String) {
-    // Make sure the mail dir exists
     let mail_dir = Path::new("mail");
-    if !mail_dir.exists() {
-        fs::create_dir(mail_dir).unwrap();
-    }
-
     let now = format!("{}.eml", Utc::now().format("%Y-%m-%dT%H-%M-%S%.9f"));
     let path = mail_dir.join(Path::new(&now));
 
