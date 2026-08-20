@@ -3,18 +3,25 @@ use crate::smtp::{
     message::{ExtendedHelloMessage, HelloMessage, RecipientMessage, Request, Response},
 };
 
-#[derive(Default)]
 pub struct SMTPState {
     domain: Option<String>,
     from: Option<String>,
     recipient: Option<String>,
     pub receiving_data: bool, // Whether we are receiving data from client
     data: Vec<String>,
+    received_callback: fn(String),
 }
 
 impl SMTPState {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(received_callback: fn(String)) -> Self {
+        Self {
+            domain: None,
+            from: None,
+            recipient: None,
+            receiving_data: false,
+            data: Vec::new(),
+            received_callback,
+        }
     }
 
     pub fn handle_data_content(&mut self, data: String) -> Option<Response> {
@@ -29,6 +36,7 @@ impl SMTPState {
             self.data.pop();
 
             self.receiving_data = false;
+            (self.received_callback)(self.data.join(""));
             Some(Response::Ok(()))
         } else {
             None

@@ -1,7 +1,11 @@
 use std::{
+    fs,
     net::{SocketAddr, TcpListener, TcpStream},
+    path::Path,
     thread::{self, JoinHandle},
 };
+
+use chrono::Utc;
 
 use crate::{
     smtp::{
@@ -39,7 +43,7 @@ fn listen(listener: TcpListener) {
 }
 
 fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
-    let mut state = SMTPState::new();
+    let mut state = SMTPState::new(handle_mail_received);
     let mut line_parser = LineParser::new(stream.try_clone().unwrap());
     println!("Connected to client: {addr}");
 
@@ -65,4 +69,18 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
     }
 
     println!("Connection closed with peer: {addr}");
+}
+
+fn handle_mail_received(mail: String) {
+    // Make sure the mail dir exists
+    let mail_dir = Path::new("mail");
+    if !mail_dir.exists() {
+        fs::create_dir(mail_dir).unwrap();
+    }
+
+    let now = format!("{}.eml", Utc::now().format("%Y-%m-%dT%H-%M-%S%.9f"));
+    let path = mail_dir.join(Path::new(&now));
+    dbg!(&path);
+
+    fs::write(path, mail).unwrap();
 }

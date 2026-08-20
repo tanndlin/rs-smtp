@@ -5,7 +5,7 @@
                 {
                     "name": "Run",
                     "commands": [
-                        "cargo watch -x 'run' -c"
+                        "cargo watch -w src -x run -c"
                     ]
                 },
                 {
