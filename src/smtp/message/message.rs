@@ -1,8 +1,6 @@
-use crate::{
-    smtp::message::{extended_hello::ExtendedHello, hello::Hello, ready::Ready},
-    util::encode_to::EncodeTo,
-};
+use crate::smtp::message::{extended_hello::ExtendedHello, hello::Hello};
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub enum Message {
     HELO(Hello),

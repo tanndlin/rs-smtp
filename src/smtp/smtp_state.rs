@@ -10,6 +10,8 @@ impl SMTPState {
     }
 
     pub fn handle_message(&mut self, message: Message) -> Response {
+        dbg!(&message);
+
         match message {
             Message::HELO(helo) => self.handle_hello(helo),
             Message::EHLO(ehlo) => self.handle_extended_hello(ehlo),
@@ -18,11 +20,11 @@ impl SMTPState {
 
     fn handle_extended_hello(&mut self, ehlo: ExtendedHello) -> Response {
         self.domain = Some(ehlo.domain);
-        todo!()
+        Response::Ok(())
     }
 
     fn handle_hello(&mut self, helo: Hello) -> Response {
         self.domain = Some(helo.domain);
-        todo!()
+        Response::Ok(())
     }
 }

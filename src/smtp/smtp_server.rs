@@ -1,12 +1,12 @@
-use core::panic;
 use std::{
+    io::Write,
     net::{SocketAddr, TcpListener, TcpStream},
     thread::{self, JoinHandle},
 };
 
 use crate::{
     smtp::{
-        message::{ExtendedHello, Hello, Message, Ready},
+        message::{Message, Ready, Response},
         smtp_state::SMTPState,
     },
     util::{encode_to::EncodeTo, line_parser::LineParser},
@@ -40,26 +40,18 @@ fn listen(listener: TcpListener) {
 }
 
 fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
-    let state = SMTPState::new();
+    let mut state = SMTPState::new();
     let mut line_parser = LineParser::new(stream.try_clone().unwrap());
     println!("Connected to client: {addr}");
 
-    let ready = Ready::new();
+    let ready = Response::Ready(Ready::new());
     ready.write_to(&mut stream).unwrap();
 
     loop {
         let message = line_parser.next_line().unwrap();
         let command = Message::try_from(message).unwrap();
-        dbg!(&command);
+        let response = state.handle_message(command);
 
-        match command {
-            Message::EHLO(ehlo) => handle_extended_hello(ehlo),
-            Message::HELO(helo) => handle_hello(helo),
-            _ => panic!("Unknown command"),
-        }
+        response.write_to(&mut stream).unwrap();
     }
 }
-
-fn handle_extended_hello(ehlo: ExtendedHello) {}
-
-fn handle_hello(helo: Hello) {}

@@ -35,8 +35,13 @@ impl LineParser {
             .stream
             .read(&mut self.read_buf)
             .map_err(|_| "Failed to read from stream")?;
-        println!("read {bytes_read} bytes");
 
+        if bytes_read == 0 {
+            // Connection closed
+            return Err("Connection Closed".to_string());
+        }
+
+        println!("read {bytes_read} bytes");
         self.buf.extend(self.read_buf);
         self.next_line()
     }
