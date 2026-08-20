@@ -1,12 +1,11 @@
 use std::{
-    io::Write,
     net::{SocketAddr, TcpListener, TcpStream},
     thread::{self, JoinHandle},
 };
 
 use crate::{
     smtp::{
-        message::{Message, Ready, Response},
+        message::{Ready, Request, Response},
         smtp_state::SMTPState,
     },
     util::{encode_to::EncodeTo, line_parser::LineParser},
@@ -51,7 +50,7 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
         let message = line_parser.next_line().unwrap();
         dbg!(&message);
         if !state.receiving_data {
-            let command = Message::try_from(message).unwrap();
+            let command = Request::try_from(message).unwrap();
             let response = state.handle_message(command);
 
             if matches!(response, Response::Closing(_)) {

@@ -1,6 +1,6 @@
 use crate::smtp::{
     mail::MailMessage,
-    message::{ExtendedHelloMessage, HelloMessage, Message, RecipientMessage, Response},
+    message::{ExtendedHelloMessage, HelloMessage, RecipientMessage, Request, Response},
 };
 
 #[derive(Default)]
@@ -35,16 +35,16 @@ impl SMTPState {
         }
     }
 
-    pub fn handle_message(&mut self, message: Message) -> Response {
+    pub fn handle_message(&mut self, message: Request) -> Response {
         dbg!(&message);
 
         match message {
-            Message::Hello(helo) => self.handle_hello(helo),
-            Message::EHello(ehlo) => self.handle_extended_hello(ehlo),
-            Message::Mail(mail) => self.handle_mail(mail),
-            Message::Recipient(recipient) => self.handle_recipient(recipient),
-            Message::Data(_) => self.handle_data_command(),
-            Message::Quit(_) => self.handle_quit(),
+            Request::Hello(helo) => self.handle_hello(helo),
+            Request::EHello(ehlo) => self.handle_extended_hello(ehlo),
+            Request::Mail(mail) => self.handle_mail(mail),
+            Request::Recipient(recipient) => self.handle_recipient(recipient),
+            Request::Data(_) => self.handle_data_command(),
+            Request::Quit(_) => self.handle_quit(),
         }
     }
 

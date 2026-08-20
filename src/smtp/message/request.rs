@@ -7,7 +7,7 @@ use crate::smtp::{
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
-pub enum Message {
+pub enum Request {
     Hello(HelloMessage),
     EHello(ExtendedHelloMessage),
     Mail(MailMessage),
@@ -16,18 +16,18 @@ pub enum Message {
     Quit(()),
 }
 
-impl TryFrom<String> for Message {
+impl TryFrom<String> for Request {
     type Error = String;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let (command, rest) = value.split_once(' ').unwrap_or((value.as_str().trim(), ""));
         Ok(match command {
-            "EHLO" => Message::Hello(HelloMessage::from(rest)),
-            "HELO" => Message::EHello(ExtendedHelloMessage::from(rest)),
-            "MAIL" => Message::Mail(MailMessage::from(rest)),
-            "RCPT" => Message::Recipient(RecipientMessage::from(rest)),
-            "DATA" => Message::Data(()),
-            "QUIT" => Message::Quit(()),
+            "EHLO" => Request::Hello(HelloMessage::from(rest)),
+            "HELO" => Request::EHello(ExtendedHelloMessage::from(rest)),
+            "MAIL" => Request::Mail(MailMessage::from(rest)),
+            "RCPT" => Request::Recipient(RecipientMessage::from(rest)),
+            "DATA" => Request::Data(()),
+            "QUIT" => Request::Quit(()),
             _ => return Err(format!("Unknown command: {command}")),
         })
     }
