@@ -1,7 +1,13 @@
-pub struct Hello {}
+#[derive(Debug)]
+pub struct Hello {
+    pub domain: String,
+}
 
-impl From<&[u8]> for Hello {
-    fn from(value: &[u8]) -> Self {
-        todo!()
+impl From<&str> for Hello {
+    fn from(value: &str) -> Self {
+        dbg!(&value);
+
+        let domain = value.trim_end().to_string();
+        Self { domain }
     }
 }

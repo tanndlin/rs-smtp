@@ -1,5 +1,6 @@
 use crate::util::encode_to::EncodeTo;
 
+#[derive(Debug)]
 pub struct Ready {
     message: String,
 }

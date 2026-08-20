@@ -1,12 +1,15 @@
+use core::panic;
 use std::{
-    io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     thread::{self, JoinHandle},
 };
 
 use crate::{
-    smtp::message::{Message, Ready},
-    util::encode_to::EncodeTo,
+    smtp::{
+        message::{ExtendedHello, Hello, Message, Ready},
+        smtp_state::SMTPState,
+    },
+    util::{encode_to::EncodeTo, line_parser::LineParser},
 };
 
 pub struct SMTPServer {
@@ -37,13 +40,26 @@ fn listen(listener: TcpListener) {
 }
 
 fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
+    let state = SMTPState::new();
+    let mut line_parser = LineParser::new(stream.try_clone().unwrap());
     println!("Connected to client: {addr}");
 
-    let ready = Message::Ready(Ready::new());
+    let ready = Ready::new();
     ready.write_to(&mut stream).unwrap();
 
-    let mut buf = [0u8; 1024];
-    let bytes_read = stream.read(&mut buf).unwrap();
-    let string = str::from_utf8(&buf[..bytes_read]).unwrap();
-    println!("Read {bytes_read} bytes: {string}");
+    loop {
+        let message = line_parser.next_line().unwrap();
+        let command = Message::try_from(message).unwrap();
+        dbg!(&command);
+
+        match command {
+            Message::EHLO(ehlo) => handle_extended_hello(ehlo),
+            Message::HELO(helo) => handle_hello(helo),
+            _ => panic!("Unknown command"),
+        }
+    }
 }
+
+fn handle_extended_hello(ehlo: ExtendedHello) {}
+
+fn handle_hello(helo: Hello) {}

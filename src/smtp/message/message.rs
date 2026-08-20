@@ -3,20 +3,21 @@ use crate::{
     util::encode_to::EncodeTo,
 };
 
+#[derive(Debug)]
 pub enum Message {
-    Ready(Ready),
     HELO(Hello),
     EHLO(ExtendedHello),
 }
 
-impl EncodeTo for Message {
-    fn encode_to(self, buf: &mut Vec<u8>) {
-        match self {
-            Message::Ready(ready) => ready.encode_to(buf),
-            Message::HELO(hello) => todo!(),
-            Message::EHLO(extended_hello) => todo!(),
-        };
+impl TryFrom<String> for Message {
+    type Error = String;
 
-        buf.extend(b"\r\n");
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let (command, rest) = value.split_once(" ").expect("No spaces in message"); // TODO: THere is probably a valid message spec with only command
+        Ok(match command {
+            "EHLO" => Message::HELO(Hello::from(rest)),
+            "HELO" => Message::EHLO(ExtendedHello::from(rest)),
+            _ => return Err(format!("Unknown command: {command}")),
+        })
     }
 }
