@@ -11,10 +11,10 @@ impl EncodeTo for Response {
     fn encode_to(self, buf: &mut Vec<u8>) {
         match self {
             Response::Ready(ready) => ready.encode_to(buf),
-            Response::Ok(_) => buf.extend(b"250 OK\r\n"),
-            Response::Closing(_) => buf.extend(b"221 rs-smtp v0.1 closing channel\r\n"),
-            Response::StartMailInput(_) => buf.extend(b"354 start mail input\r\n"),
-        };
+            Response::Ok(()) => buf.extend(b"250 OK\r\n"),
+            Response::Closing(()) => buf.extend(b"221 rs-smtp v0.1 closing channel\r\n"),
+            Response::StartMailInput(()) => buf.extend(b"354 start mail input\r\n"),
+        }
 
         buf.extend(b"\r\n");
     }

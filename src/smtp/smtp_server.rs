@@ -53,16 +53,14 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
             let command = Request::try_from(message).unwrap();
             let response = state.handle_message(command);
 
-            if matches!(response, Response::Closing(_)) {
+            if matches!(response, Response::Closing(())) {
                 response.write_to(&mut stream).unwrap();
                 break;
             }
 
             response.write_to(&mut stream).unwrap();
-        } else {
-            if let Some(res) = state.handle_data_content(message) {
-                res.write_to(&mut stream).unwrap();
-            }
+        } else if let Some(res) = state.handle_data_content(message) {
+            res.write_to(&mut stream).unwrap();
         }
     }
 

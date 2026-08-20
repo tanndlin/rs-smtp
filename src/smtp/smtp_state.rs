@@ -43,8 +43,8 @@ impl SMTPState {
             Request::EHello(ehlo) => self.handle_extended_hello(ehlo),
             Request::Mail(mail) => self.handle_mail(mail),
             Request::Recipient(recipient) => self.handle_recipient(recipient),
-            Request::Data(_) => self.handle_data_command(),
-            Request::Quit(_) => self.handle_quit(),
+            Request::Data(()) => self.handle_data_command(),
+            Request::Quit(()) => self.handle_quit(),
         }
     }
 
