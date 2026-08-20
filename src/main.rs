@@ -3,6 +3,7 @@
 use crate::smtp::SMTPServer;
 
 mod smtp;
+mod util;
 
 fn main() {
     let server = SMTPServer::new("0.0.0.0:2525".parse().expect("Invalid address"))

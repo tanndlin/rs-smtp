@@ -1,6 +1,12 @@
 use std::{
-    net::{IpAddr, SocketAddr, TcpListener, TcpStream},
-    thread::{self, JoinHandle, Thread},
+    io::{Read, Write},
+    net::{SocketAddr, TcpListener, TcpStream},
+    thread::{self, JoinHandle},
+};
+
+use crate::{
+    smtp::message::{Message, Ready},
+    util::encode_to::EncodeTo,
 };
 
 pub struct SMTPServer {
@@ -30,6 +36,14 @@ fn listen(listener: TcpListener) {
     }
 }
 
-fn handle_request(stream: TcpStream, addr: SocketAddr) {
-    println!("Connected to client: {addr}")
+fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
+    println!("Connected to client: {addr}");
+
+    let ready = Message::Ready(Ready::new());
+    ready.write_to(&mut stream).unwrap();
+
+    let mut buf = [0u8; 1024];
+    let bytes_read = stream.read(&mut buf).unwrap();
+    let string = str::from_utf8(&buf[..bytes_read]).unwrap();
+    println!("Read {bytes_read} bytes: {string}");
 }
