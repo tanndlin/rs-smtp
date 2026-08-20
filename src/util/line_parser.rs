@@ -18,8 +18,6 @@ impl LineParser {
     pub fn next_line(&mut self) -> Result<String, String> {
         // TODO: This might be improved by an event system instead of linear scan
 
-        println!("Buf len {}", self.buf.len());
-
         // Check for \r\n in current buf
         for (i, window) in self.buf.windows(2).enumerate() {
             if window == b"\r\n" {
@@ -28,7 +26,6 @@ impl LineParser {
                     .to_string();
 
                 self.buf.drain(0..message.len());
-                println!("Buf len {}", self.buf.len());
 
                 return Ok(message);
             }

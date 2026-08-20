@@ -1,9 +1,9 @@
 #[derive(Debug)]
-pub struct ExtendedHello {
+pub struct ExtendedHelloMessage {
     pub domain: String,
 }
 
-impl From<&str> for ExtendedHello {
+impl From<&str> for ExtendedHelloMessage {
     fn from(value: &str) -> Self {
         dbg!(&value);
 
