@@ -25,22 +25,17 @@ impl SMTPState {
     }
 
     pub fn handle_data_content(&mut self, data: String) -> Option<Response> {
-        // TODO: I hate this
-        self.data.push(data);
-
-        if self.data.last().unwrap() == ".\r\n"
-            && let Some(second_to_last) = self.data.iter().nth_back(1)
-            && second_to_last == "\r\n"
-        {
-            self.data.pop();
-            self.data.pop();
-
+        if data == ".\r\n" {
             self.receiving_data = false;
             (self.received_callback)(self.data.join(""));
-            Some(Response::Ok(()))
-        } else {
-            None
+            self.data.clear();
+            return Some(Response::Ok(()));
         }
+
+        // dot-stuffing (RFC 5321 4.5.2).
+        let line = data.strip_prefix('.').map_or(data.as_str(), |rest| rest);
+        self.data.push(line.to_string());
+        None
     }
 
     pub fn handle_message(&mut self, message: Request) -> Response {
