@@ -1,6 +1,19 @@
 name: tmail
 
 services:
+  consumer:
+    build: ./consumer
+    container_name: tmail-consumer
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - tmail-network
+    restart: unless-stopped
+    pid: "host"
+
   db:
     image: postgres:15-alpine
     container_name: tmail-postgres-db
@@ -11,12 +24,12 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: tmail
     ports:
-      - "5432:5432"
+      - '5432:5432'
     networks:
       - tmail-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d tmail"]
+      test: [ "CMD-SHELL", "pg_isready -U user -d tmail" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -30,13 +43,13 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5672:5672" # AMQP protocol port
-      - "15672:15672" # Management UI dashboard
+      - '5672:5672' # AMQP protocol port
+      - '15672:15672' # Management UI dashboard
     networks:
       - tmail-network
     restart: always
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -55,7 +68,7 @@ services:
       - API_PORT=2525
       - DATABASE_URL=postgresql://user:password@db:5432/tmail
     ports:
-      - "2525:2525"
+      - '2525:2525'
     networks:
       - tmail-network
     restart: unless-stopped
