@@ -1,4 +1,4 @@
-mod mail;
+mod email;
 mod message;
 mod smtp_server;
 mod smtp_state;

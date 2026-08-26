@@ -11,8 +11,20 @@ services:
         condition: service_healthy
     networks:
       - tmail-network
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/tmail
     restart: unless-stopped
     pid: "host"
+    develop:
+      watch:
+        - action: rebuild
+          path: ./consumer/src
+        - action: rebuild
+          path: ./consumer/migrations
+        - action: rebuild
+          path: ./consumer/Cargo.toml
+        - action: rebuild
+          path: ./consumer/Cargo.lock
 
   db:
     image: postgres:15-alpine
@@ -24,12 +36,12 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: tmail
     ports:
-      - '5432:5432'
+      - "5432:5432"
     networks:
       - tmail-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U user -d tmail" ]
+      test: ["CMD-SHELL", "pg_isready -U user -d tmail"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -43,13 +55,13 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - '5672:5672' # AMQP protocol port
-      - '15672:15672' # Management UI dashboard
+      - "5672:5672" # AMQP protocol port
+      - "15672:15672" # Management UI dashboard
     networks:
       - tmail-network
     restart: always
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -68,11 +80,19 @@ services:
       - API_PORT=2525
       - DATABASE_URL=postgresql://user:password@db:5432/tmail
     ports:
-      - '2525:2525'
+      - "2525:2525"
     networks:
       - tmail-network
     restart: unless-stopped
     pid: "host"
+    develop:
+      watch:
+        - action: rebuild
+          path: ./smtp/src
+        - action: rebuild
+          path: ./smtp/Cargo.toml
+        - action: rebuild
+          path: ./smtp/Cargo.lock
 
 networks:
   tmail-network:

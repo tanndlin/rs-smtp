@@ -1,23 +1,25 @@
 use crate::smtp::{
-    mail::MailMessage,
-    message::{ExtendedHelloMessage, HelloMessage, RecipientMessage, Request, Response},
+    email::Email,
+    message::{
+        ExtendedHelloMessage, HelloMessage, MailMessage, RecipientMessage, Request, Response,
+    },
 };
 
 pub struct SMTPState {
     domain: Option<String>,
     from: Option<String>,
-    recipient: Option<String>,
+    recipient: Vec<String>,
     pub receiving_data: bool, // Whether we are receiving data from client
     data: Vec<String>,
-    received_callback: Box<dyn FnMut(String)>,
+    received_callback: Box<dyn FnMut(Email)>,
 }
 
 impl SMTPState {
-    pub fn new(received_callback: impl FnMut(String) + 'static) -> Self {
+    pub fn new(received_callback: impl FnMut(Email) + 'static) -> Self {
         Self {
             domain: None,
             from: None,
-            recipient: None,
+            recipient: vec![],
             receiving_data: false,
             data: Vec::new(),
             received_callback: Box::new(received_callback),
@@ -27,7 +29,8 @@ impl SMTPState {
     pub fn handle_data_content(&mut self, data: String) -> Option<Response> {
         if data == ".\r\n" {
             self.receiving_data = false;
-            (self.received_callback)(self.data.join(""));
+            let email = Email::from(&*self);
+            (self.received_callback)(email);
             self.data.clear();
             return Some(Response::Ok(()));
         }
@@ -65,7 +68,7 @@ impl SMTPState {
     }
 
     fn handle_recipient(&mut self, mail: RecipientMessage) -> Response {
-        self.recipient = Some(mail.to);
+        self.recipient.push(mail.to);
         Response::Ok(())
     }
 
@@ -76,5 +79,15 @@ impl SMTPState {
 
     fn handle_quit(&self) -> Response {
         Response::Closing(())
+    }
+}
+
+impl From<&SMTPState> for Email {
+    fn from(value: &SMTPState) -> Self {
+        Email {
+            from: value.from.clone().unwrap(),
+            to: value.recipient.clone(),
+            data: value.data.join(""),
+        }
     }
 }

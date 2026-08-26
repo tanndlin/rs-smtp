@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     fs,
     net::{SocketAddr, TcpListener, TcpStream},
     path::Path,
@@ -6,10 +7,11 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use amiquip::{Channel, Connection, Exchange, Publish};
+use amiquip::{AmqpProperties, AmqpValue, Channel, Connection, Exchange, Publish};
 
 use crate::{
     smtp::{
+        email::Email,
         message::{Ready, Request, Response},
         smtp_state::SMTPState,
     },
@@ -56,7 +58,7 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: Arc<Mutex
         .open_channel(None)
         .unwrap();
 
-    let mut state = SMTPState::new(move |mail| handle_mail_received(&mail, &channel));
+    let mut state = SMTPState::new(move |email| handle_mail_received(email, &channel));
     let mut line_parser = LineParser::new(stream.try_clone().unwrap());
     #[cfg(debug_assertions)]
     println!("Connected to client: {addr}");
@@ -84,8 +86,17 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: Arc<Mutex
     dbg!("Connection closed with peer: {addr}");
 }
 
-fn handle_mail_received(mail: &str, channel: &Channel) {
+fn handle_mail_received(email: Email, channel: &Channel) {
+    let mut headers = BTreeMap::new();
+    headers.insert("from".to_string(), AmqpValue::LongString(email.from));
+    headers.insert(
+        "recipients".to_string(),
+        AmqpValue::LongString(email.to.join(";")),
+    );
+
+    let properties = AmqpProperties::default().with_headers(headers);
+    let payload = email.data.as_bytes();
     Exchange::direct(channel)
-        .publish(Publish::new(mail.as_bytes(), "mail"))
+        .publish(Publish::with_properties(payload, "mail", properties))
         .unwrap();
 }

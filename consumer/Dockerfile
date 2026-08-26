@@ -2,12 +2,19 @@
 FROM rust:1.98 AS builder
 WORKDIR /app
 
+# No DB reachable during `docker build`, so sqlx::query! must check against the
+# committed .sqlx/ offline cache instead of a live database.
+ENV SQLX_OFFLINE=true
+
 COPY Cargo.toml Cargo.lock ./
 
 # Build deps only using dummy src — this layer is cached until Cargo.toml/Cargo.lock changes
 RUN mkdir -p src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 RUN rm -rf src
+
+COPY migrations ./migrations
+COPY .sqlx ./.sqlx
 
 # Copy real source and touch main.rs so cargo knows to recompile
 COPY src ./src

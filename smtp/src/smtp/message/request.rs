@@ -1,9 +1,4 @@
-use crate::smtp::{
-    mail::MailMessage,
-    message::{
-        extended_hello::ExtendedHelloMessage, hello::HelloMessage, recipient::RecipientMessage,
-    },
-};
+use crate::smtp::message::{ExtendedHelloMessage, HelloMessage, MailMessage, RecipientMessage};
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
