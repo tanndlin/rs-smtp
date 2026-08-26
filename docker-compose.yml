@@ -66,6 +66,31 @@ services:
       timeout: 5s
       retries: 3
 
+  imap:
+    build: ./imap
+    container_name: tmail-imap-server
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - tmail-network
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/tmail
+    restart: unless-stopped
+    pid: "host"
+    develop:
+      watch:
+        - action: rebuild
+          path: ./imap/src
+        - action: rebuild
+          path: ./imap/migrations
+        - action: rebuild
+          path: ./imap/Cargo.toml
+        - action: rebuild
+          path: ./imap/Cargo.lock
+
   smtp:
     build: ./smtp
     container_name: tmail-smtp
