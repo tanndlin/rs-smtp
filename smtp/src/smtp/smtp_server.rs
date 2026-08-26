@@ -77,7 +77,7 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
 }
 
 fn handle_mail_received(mail: String) {
-    let mail_dir = Path::new("mail");
+    let mail_dir = Path::new("/mail");
     let now = format!("{}.eml", Utc::now().format("%Y-%m-%dT%H-%M-%S%.9f"));
     let path = mail_dir.join(Path::new(&now));
 
