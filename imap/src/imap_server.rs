@@ -1,10 +1,13 @@
 use std::{
-    net::{IpAddr, SocketAddr, TcpListener, TcpStream},
+    io::{Read, Write},
+    net::{SocketAddr, TcpListener, TcpStream},
     sync::Arc,
-    thread::{self, JoinHandle},
+    thread::{self},
 };
 
 use sqlx::{Pool, Postgres};
+
+use crate::imap_state::IMAPState;
 
 pub struct IMAPServer {
     db_pool: Arc<Pool<Postgres>>,
@@ -32,6 +35,22 @@ impl IMAPServer {
 }
 
 fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Postgres>>) {
+    #[cfg(debug_assertions)]
+    dbg!("Connection opened with peer: {addr}");
+
+    // Send greeting
+    stream.write_all(b"*OK IMAP4rev1 Server Ready\r\n").unwrap();
+
+    let mut state = IMAPState::new();
+    let mut buf = [0; 4096];
+    while let Ok(bytes_read) = stream.read(&mut buf)
+        && bytes_read > 0
+    {
+        println!("Read {bytes_read} bytes");
+        let str = str::from_utf8(&buf).unwrap();
+        println!("{str}")
+    }
+
     #[cfg(debug_assertions)]
     dbg!("Connection closed with peer: {addr}");
 }
