@@ -2,10 +2,11 @@ use std::{
     fs,
     net::{SocketAddr, TcpListener, TcpStream},
     path::Path,
+    sync::{Arc, Mutex, PoisonError},
     thread::{self, JoinHandle},
 };
 
-use chrono::Utc;
+use amiquip::{Channel, Connection, Exchange, Publish};
 
 use crate::{
     smtp::{
@@ -20,12 +21,12 @@ pub struct SMTPServer {
 }
 
 impl SMTPServer {
-    pub fn new(addr: SocketAddr) -> Result<Self, String> {
+    pub fn new(addr: SocketAddr, connection: Arc<Mutex<Connection>>) -> Result<Self, String> {
         let listener =
             TcpListener::bind(addr).map_err(|e| format!("Error creating tcp listener {e}"))?;
 
         println!("Listening on {addr}");
-        let listen_thread = thread::spawn(|| listen(listener));
+        let listen_thread = thread::spawn(move || listen(listener, connection));
 
         let mail_dir = Path::new("mail");
         if !mail_dir.exists() {
@@ -40,15 +41,22 @@ impl SMTPServer {
     }
 }
 
-fn listen(listener: TcpListener) {
+fn listen(listener: TcpListener, connection: Arc<Mutex<Connection>>) {
     loop {
         let (stream, addr) = listener.accept().unwrap();
-        thread::spawn(move || handle_request(stream, addr));
+        let connection = connection.clone();
+        thread::spawn(move || handle_request(stream, addr, connection));
     }
 }
 
-fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
-    let mut state = SMTPState::new(handle_mail_received);
+fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: Arc<Mutex<Connection>>) {
+    let channel = connection
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .open_channel(None)
+        .unwrap();
+
+    let mut state = SMTPState::new(move |mail| handle_mail_received(&mail, &channel));
     let mut line_parser = LineParser::new(stream.try_clone().unwrap());
     #[cfg(debug_assertions)]
     println!("Connected to client: {addr}");
@@ -76,10 +84,8 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr) {
     dbg!("Connection closed with peer: {addr}");
 }
 
-fn handle_mail_received(mail: String) {
-    let mail_dir = Path::new("/mail");
-    let now = format!("{}.eml", Utc::now().format("%Y-%m-%dT%H-%M-%S%.9f"));
-    let path = mail_dir.join(Path::new(&now));
-
-    fs::write(path, mail).unwrap();
+fn handle_mail_received(mail: &str, channel: &Channel) {
+    Exchange::direct(channel)
+        .publish(Publish::new(mail.as_bytes(), "mail"))
+        .unwrap();
 }

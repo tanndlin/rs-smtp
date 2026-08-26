@@ -32,6 +32,8 @@ services:
     ports:
       - "5672:5672" # AMQP protocol port
       - "15672:15672" # Management UI dashboard
+    networks:
+      - tmail-network
     restart: always
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
@@ -44,6 +46,8 @@ services:
     container_name: tmail-smtp
     depends_on:
       db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     volumes:
       - ./smtp/mail:/mail

@@ -9,18 +9,18 @@ pub struct SMTPState {
     recipient: Option<String>,
     pub receiving_data: bool, // Whether we are receiving data from client
     data: Vec<String>,
-    received_callback: fn(String),
+    received_callback: Box<dyn FnMut(String)>,
 }
 
 impl SMTPState {
-    pub fn new(received_callback: fn(String)) -> Self {
+    pub fn new(received_callback: impl FnMut(String) + 'static) -> Self {
         Self {
             domain: None,
             from: None,
             recipient: None,
             receiving_data: false,
             data: Vec::new(),
-            received_callback,
+            received_callback: Box::new(received_callback),
         }
     }
 
