@@ -1,6 +1,7 @@
 use tokio::net::windows::named_pipe::PipeEnd::Server;
 
-use crate::{response::CapabilityResponse, util::EncodeTo};
+use crate::response::CapabilityResponse;
+use util::EncodeTo;
 
 pub enum ServerResponse {
     Capability(CapabilityResponse),

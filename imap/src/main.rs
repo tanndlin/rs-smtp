@@ -7,7 +7,6 @@ mod command;
 mod imap_server;
 mod imap_state;
 mod response;
-mod util;
 
 #[tokio::main]
 async fn main() {

@@ -2,7 +2,9 @@ name: tmail
 
 services:
   consumer:
-    build: ./consumer
+    build:
+      context: .
+      dockerfile: consumer/Dockerfile
     container_name: tmail-consumer
     depends_on:
       db:
@@ -20,11 +22,13 @@ services:
         - action: rebuild
           path: ./consumer/src
         - action: rebuild
-          path: ./consumer/migrations
+          path: ./util/src
+        - action: rebuild
+          path: ./migrations
         - action: rebuild
           path: ./consumer/Cargo.toml
         - action: rebuild
-          path: ./consumer/Cargo.lock
+          path: ./Cargo.lock
 
   db:
     image: postgres:15-alpine
@@ -92,7 +96,9 @@ services:
           path: ./imap/Cargo.lock
 
   smtp:
-    build: ./smtp
+    build:
+      context: .
+      dockerfile: smtp/Dockerfile
     container_name: tmail-smtp
     depends_on:
       db:
@@ -115,9 +121,11 @@ services:
         - action: rebuild
           path: ./smtp/src
         - action: rebuild
+          path: ./util/src
+        - action: rebuild
           path: ./smtp/Cargo.toml
         - action: rebuild
-          path: ./smtp/Cargo.lock
+          path: ./Cargo.lock
 
 networks:
   tmail-network:

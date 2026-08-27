@@ -15,8 +15,9 @@ use crate::{
         message::{Ready, Request, Response},
         smtp_state::SMTPState,
     },
-    util::{encode_to::EncodeTo, line_parser::LineParser},
+    util::line_parser::LineParser,
 };
+use util::EncodeTo;
 
 pub struct SMTPServer {
     listen_thread: JoinHandle<()>,

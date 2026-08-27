@@ -7,7 +7,8 @@ use std::{
 
 use sqlx::{Pool, Postgres};
 
-use crate::{command::ClientCommand, imap_state::IMAPState, util::EncodeTo};
+use crate::{command::ClientCommand, imap_state::IMAPState};
+use util::EncodeTo;
 
 pub struct IMAPServer {
     db_pool: Arc<Pool<Postgres>>,

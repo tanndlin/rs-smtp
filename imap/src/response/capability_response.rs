@@ -1,4 +1,5 @@
-use crate::{response::ServerResponse, util::EncodeTo};
+use crate::response::ServerResponse;
+use util::EncodeTo;
 
 pub struct CapabilityResponse {}
 

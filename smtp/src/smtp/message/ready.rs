@@ -1,4 +1,4 @@
-use crate::util::encode_to::EncodeTo;
+use util::EncodeTo;
 
 #[derive(Debug)]
 pub struct Ready {

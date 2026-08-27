@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+util = { path = "../util" }
 amiquip = "0.4.2"
 chrono = "0.4.45"
 
-[workspace.lints.clippy]
-pedantic = { level = "warn", priority = -1 }
+[lints]
+workspace = true

@@ -1,4 +1,5 @@
-use crate::{smtp::message::Ready, util::encode_to::EncodeTo};
+use crate::smtp::message::Ready;
+use util::EncodeTo;
 
 pub enum Response {
     Ready(Ready),
