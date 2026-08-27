@@ -1,4 +1,4 @@
-use crate::command::{CapabilityCommand, StartTLSCommand};
+use crate::command::{CapabilityCommand, CommandParseError, StartTLSCommand};
 
 #[derive(Debug)]
 pub enum ClientCommand {
@@ -7,7 +7,7 @@ pub enum ClientCommand {
 }
 
 impl ClientCommand {
-    pub fn parse_bytes(buf: &[u8]) -> Option<(Self, usize)> {
+    pub fn parse_bytes(buf: &[u8]) -> Result<(Self, usize), CommandParseError> {
         let str = str::from_utf8(buf).unwrap();
         dbg!(str);
         let lines = str.split("\r\n").collect::<Vec<_>>();
@@ -15,8 +15,11 @@ impl ClientCommand {
         println!("Got line: {:?}", line);
 
         let mut split = line.splitn(3, " ");
-        let tag = split.next().unwrap().to_string();
-        let command_text = split.next().unwrap();
+        let tag = split
+            .next()
+            .ok_or(CommandParseError::MalformedCommand)?
+            .to_string();
+        let command_text = split.next().ok_or(CommandParseError::MalformedCommand)?;
         let rest = split
             .next()
             .unwrap_or_default()
@@ -30,13 +33,23 @@ impl ClientCommand {
         dbg!(&command_text);
 
         match command_text {
-            "CAPABILITY" => Some((CapabilityCommand::with_args(tag, &rest).into(), bytes_read)),
-            "STARTTLS" => Some((StartTLSCommand::with_args(tag, &rest).into(), bytes_read)),
-            _ => None,
+            "CAPABILITY" => Ok((CapabilityCommand::with_args(tag, &rest).into(), bytes_read)),
+            "STARTTLS" => Ok((StartTLSCommand::with_args(tag, &rest).into(), bytes_read)),
+            _ => todo!("Probably havent implemented {command_text} yet"),
         }
     }
 }
 
 pub trait ClientCommandTrait {
     fn with_args(tag: String, args: &[String]) -> Self;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bare_tag_does_not_panic() {
+        assert!(ClientCommand::parse_bytes(b"a1\r\n").is_err());
+    }
 }

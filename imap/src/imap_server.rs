@@ -37,7 +37,7 @@ impl IMAPServer {
 
 fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Postgres>>) {
     #[cfg(debug_assertions)]
-    dbg!(format!("Connection opened with peer: {addr}"));
+    println!("Connection opened with peer: {addr}");
 
     // Send greeting
     let mut state = IMAPState::new();
@@ -51,14 +51,17 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Pos
     {
         println!("Read {bytes_read} bytes");
         bytes.extend_from_slice(&buf[..bytes_read]);
-        if let Some((command, read)) = ClientCommand::parse_bytes(&bytes) {
-            bytes.drain(0..read);
-            dbg!(&command);
-            let res = state.handle_command(command);
-            stream.write_all(&res.to_bytes()).unwrap();
+        match ClientCommand::parse_bytes(&bytes) {
+            Ok((command, read)) => {
+                bytes.drain(0..read);
+                dbg!(&command);
+                let res = state.handle_command(command);
+                stream.write_all(&res.to_bytes()).unwrap();
+            }
+            Err(e) => todo!("{:?}", e),
         }
     }
 
     #[cfg(debug_assertions)]
-    dbg!(format!("Connection closed with peer: {addr}"));
+    dbg!("Connection closed with peer: {addr}");
 }
