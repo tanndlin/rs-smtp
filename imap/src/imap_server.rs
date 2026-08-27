@@ -7,7 +7,7 @@ use std::{
 
 use sqlx::{Pool, Postgres};
 
-use crate::imap_state::IMAPState;
+use crate::{command::ClientCommand, imap_state::IMAPState, util::EncodeTo};
 
 pub struct IMAPServer {
     db_pool: Arc<Pool<Postgres>>,
@@ -36,21 +36,31 @@ impl IMAPServer {
 
 fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Postgres>>) {
     #[cfg(debug_assertions)]
-    dbg!("Connection opened with peer: {addr}");
+    dbg!(format!("Connection opened with peer: {addr}"));
 
     // Send greeting
     stream.write_all(b"*OK IMAP4rev1 Server Ready\r\n").unwrap();
 
     let mut state = IMAPState::new();
+
+    let mut bytes = vec![];
     let mut buf = [0; 4096];
     while let Ok(bytes_read) = stream.read(&mut buf)
         && bytes_read > 0
     {
         println!("Read {bytes_read} bytes");
-        let str = str::from_utf8(&buf).unwrap();
-        println!("{str}")
+        bytes.extend_from_slice(&buf[..bytes_read]);
+        let str = str::from_utf8(&bytes).unwrap();
+        println!("{str}");
+
+        if let Some((command, read)) = ClientCommand::parse_bytes(&bytes) {
+            bytes.drain(0..read);
+            dbg!(&command);
+            let res = state.handle_command(command);
+            stream.write_all(&res.to_bytes()).unwrap();
+        }
     }
 
     #[cfg(debug_assertions)]
-    dbg!("Connection closed with peer: {addr}");
+    dbg!(format!("Connection closed with peer: {addr}"));
 }
