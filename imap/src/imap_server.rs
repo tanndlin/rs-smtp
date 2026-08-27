@@ -40,9 +40,9 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Pos
     dbg!(format!("Connection opened with peer: {addr}"));
 
     // Send greeting
-    stream.write_all(b"*OK IMAP4rev1 Server Ready\r\n").unwrap();
-
     let mut state = IMAPState::new();
+    let res = state.send_greeting();
+    stream.write_all(&res.to_bytes()).unwrap();
 
     let mut bytes = vec![];
     let mut buf = [0; 4096];
@@ -51,9 +51,6 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Pos
     {
         println!("Read {bytes_read} bytes");
         bytes.extend_from_slice(&buf[..bytes_read]);
-        let str = str::from_utf8(&bytes).unwrap();
-        println!("{str}");
-
         if let Some((command, read)) = ClientCommand::parse_bytes(&bytes) {
             bytes.drain(0..read);
             dbg!(&command);

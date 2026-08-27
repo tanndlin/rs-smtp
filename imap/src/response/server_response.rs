@@ -1,16 +1,8 @@
-use tokio::net::windows::named_pipe::PipeEnd::Server;
-
 use crate::response::CapabilityResponse;
 use util::EncodeTo;
 
 pub enum ServerResponse {
     Capability(CapabilityResponse),
-}
-
-impl ServerResponse {
-    pub fn new_capability() -> ServerResponse {
-        CapabilityResponse::new().into()
-    }
 }
 
 impl EncodeTo for ServerResponse {
@@ -19,4 +11,8 @@ impl EncodeTo for ServerResponse {
             ServerResponse::Capability(res) => res.encode_to(buf),
         }
     }
+}
+
+pub trait ServerResponseTrait<T> {
+    fn respond_to(cmd: T) -> Self;
 }

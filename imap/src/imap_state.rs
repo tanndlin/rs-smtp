@@ -1,4 +1,7 @@
-use crate::{command::ClientCommand, response::ServerResponse};
+use crate::{
+    command::ClientCommand,
+    response::{CapabilityResponse, Greeting, ServerResponse, ServerResponseTrait},
+};
 
 pub enum IMAPState {
     Uninitialized,
@@ -12,13 +15,20 @@ impl IMAPState {
         Self::Uninitialized
     }
 
-    pub fn send_greeting(&mut self) {
-        *self = Self::NotAuthenticated
+    pub fn send_greeting(&mut self) -> Greeting {
+        *self = Self::NotAuthenticated;
+        Greeting::new()
     }
 
     pub fn handle_command(&mut self, command: ClientCommand) -> ServerResponse {
-        match command {
-            ClientCommand::Capability(cmd) => ServerResponse::new_capability(),
+        match self {
+            IMAPState::Uninitialized => panic!("Recevied command in an uninitialized state"),
+            IMAPState::NotAuthenticated => match command {
+                ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
+                ClientCommand::StartTLS(cmd) => todo!(),
+            },
+            IMAPState::Authenticated => todo!(),
+            IMAPState::Logout => todo!(),
         }
     }
 }

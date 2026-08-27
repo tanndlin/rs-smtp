@@ -1,15 +1,18 @@
-use crate::command::ClientCommand;
+use crate::command::{ClientCommand, client_command::ClientCommandTrait};
 
 #[derive(Debug)]
-pub struct CapabilityCommand {}
+pub struct CapabilityCommand {
+    pub tag: String,
+}
 
-impl CapabilityCommand {
-    pub fn new(args: String) -> Self {
-        if args.len() > 0 {
+impl ClientCommandTrait for CapabilityCommand {
+    fn with_args(tag: String, args: &[String]) -> Self {
+        dbg!(args);
+        if !args.is_empty() {
             panic!();
         }
 
-        Self {}
+        Self { tag }
     }
 }
 
