@@ -27,8 +27,7 @@ fn main() {
     let connection = Arc::new(Mutex::new(connection));
     let bind = "0.0.0.0:2525".parse().expect("Invalid address");
 
-    let server =
-        SMTPServer::new(bind, connection.clone()).expect("Failed to start SMTP server");
+    let server = SMTPServer::new(bind, connection.clone()).expect("Failed to start SMTP server");
 
     server.join();
     Arc::try_unwrap(connection)

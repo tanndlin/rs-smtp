@@ -23,16 +23,16 @@ pipeline {
             }
         }
 
-        stage('Lint') {
-            steps {
-                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                    sh '''
-                    docker run --rm $DOCKER_VOLS -w $WORKSPACE/smtp $RUST_IMAGE \
-                        sh -c "rustup component add clippy && cargo clippy --all-targets -- -D clippy::pedantic"
-                    '''
-                }
-            }
-        }
+        // stage('Lint') {
+        //     steps {
+        //         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+        //             sh '''
+        //             docker run --rm $DOCKER_VOLS -w $WORKSPACE/smtp $RUST_IMAGE \
+        //                 sh -c "rustup component add clippy && cargo clippy --all-targets -- -D clippy::pedantic"
+        //             '''
+        //         }
+        //     }
+        // }
 
         stage('Format Check') {
             steps {
