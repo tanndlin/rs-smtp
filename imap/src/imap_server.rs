@@ -26,6 +26,12 @@ impl IMAPServer {
         Self { db_pool, listener }
     }
 
+    /// The address the listener is actually bound to. Useful when constructed
+    /// with port 0 (e.g. in tests) so the OS-assigned port can be discovered.
+    pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
+        self.listener.local_addr()
+    }
+
     pub fn start(&self) {
         loop {
             let (stream, addr) = self.listener.accept().unwrap();

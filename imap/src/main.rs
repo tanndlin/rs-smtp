@@ -1,12 +1,7 @@
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 
-use crate::imap_server::IMAPServer;
-
-mod command;
-mod imap_server;
-mod imap_state;
-mod response;
+use imap::imap_server::IMAPServer;
 
 #[tokio::main]
 async fn main() {
