@@ -41,7 +41,7 @@ impl IMAPServer {
     }
 }
 
-fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Postgres>>) {
+fn handle_request(mut stream: TcpStream, addr: SocketAddr, _db_pool: Arc<Pool<Postgres>>) {
     #[cfg(debug_assertions)]
     println!("Connection opened with peer: {addr}");
 

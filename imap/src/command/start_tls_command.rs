@@ -10,7 +10,7 @@ pub struct StartTLSCommand {
 
 impl ClientCommandTrait for StartTLSCommand {
     fn with_args(tag: String, args: &[String]) -> Self {
-        if args.len() > 0 {
+        if !args.is_empty() {
             panic!();
         }
 
