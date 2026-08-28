@@ -26,17 +26,17 @@ impl SMTPState {
         }
     }
 
-    pub fn handle_data_content(&mut self, data: String) -> Option<Response> {
+    pub fn handle_data_content(&mut self, data: &str) -> Option<Response> {
         if data == ".\r\n" {
             self.receiving_data = false;
             let email = Email::from(&*self);
             (self.received_callback)(email);
             self.data.clear();
-            return Some(Response::Ok(()));
+            return Some(Response::Ok);
         }
 
         // dot-stuffing (RFC 5321 4.5.2).
-        let line = data.strip_prefix('.').map_or(data.as_str(), |rest| rest);
+        let line = data.strip_prefix('.').map_or(data, |rest| rest);
         self.data.push(line.to_string());
         None
     }
@@ -47,38 +47,34 @@ impl SMTPState {
             Request::EHello(ehlo) => self.handle_extended_hello(ehlo),
             Request::Mail(mail) => self.handle_mail(mail),
             Request::Recipient(recipient) => self.handle_recipient(recipient),
-            Request::Data(()) => self.handle_data_command(),
-            Request::Quit(()) => self.handle_quit(),
+            Request::Data => self.handle_data_command(),
+            Request::Quit => Response::Closing,
         }
     }
 
     fn handle_extended_hello(&mut self, ehlo: ExtendedHelloMessage) -> Response {
         self.domain = Some(ehlo.domain);
-        Response::Ok(())
+        Response::Ok
     }
 
     fn handle_hello(&mut self, helo: HelloMessage) -> Response {
         self.domain = Some(helo.domain);
-        Response::Ok(())
+        Response::Ok
     }
 
     fn handle_mail(&mut self, mail: MailMessage) -> Response {
         self.from = Some(mail.from);
-        Response::Ok(())
+        Response::Ok
     }
 
     fn handle_recipient(&mut self, mail: RecipientMessage) -> Response {
         self.recipient.push(mail.to);
-        Response::Ok(())
+        Response::Ok
     }
 
     fn handle_data_command(&mut self) -> Response {
         self.receiving_data = true;
-        Response::StartMailInput(())
-    }
-
-    fn handle_quit(&self) -> Response {
-        Response::Closing(())
+        Response::StartMailInput
     }
 }
 

@@ -7,8 +7,8 @@ pub enum Request {
     EHello(ExtendedHelloMessage),
     Mail(MailMessage),
     Recipient(RecipientMessage),
-    Data(()),
-    Quit(()),
+    Data,
+    Quit,
 }
 
 impl TryFrom<String> for Request {
@@ -21,8 +21,8 @@ impl TryFrom<String> for Request {
             "EHLO" => Request::EHello(ExtendedHelloMessage::from(rest)),
             "MAIL" => Request::Mail(MailMessage::from(rest)),
             "RCPT" => Request::Recipient(RecipientMessage::from(rest)),
-            "DATA" => Request::Data(()),
-            "QUIT" => Request::Quit(()),
+            "DATA" => Request::Data,
+            "QUIT" => Request::Quit,
             _ => return Err(format!("Unknown command: {command}")),
         })
     }

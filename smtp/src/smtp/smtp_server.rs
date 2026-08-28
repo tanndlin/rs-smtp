@@ -29,7 +29,7 @@ impl SMTPServer {
             TcpListener::bind(addr).map_err(|e| format!("Error creating tcp listener {e}"))?;
 
         println!("Listening on {addr}");
-        let listen_thread = thread::spawn(move || listen(listener, connection));
+        let listen_thread = thread::spawn(move || listen(&listener, &connection));
 
         let mail_dir = Path::new("mail");
         if !mail_dir.exists() {
@@ -44,15 +44,15 @@ impl SMTPServer {
     }
 }
 
-fn listen(listener: TcpListener, connection: Arc<Mutex<Connection>>) {
+fn listen(listener: &TcpListener, connection: &Arc<Mutex<Connection>>) {
     loop {
         let (stream, addr) = listener.accept().unwrap();
         let connection = connection.clone();
-        thread::spawn(move || handle_request(stream, addr, connection));
+        thread::spawn(move || handle_request(stream, addr, &connection));
     }
 }
 
-fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: Arc<Mutex<Connection>>) {
+fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: &Arc<Mutex<Connection>>) {
     let channel = connection
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
@@ -72,13 +72,13 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: Arc<Mutex
             let command = Request::try_from(message).unwrap();
             let response = state.handle_message(command);
 
-            if matches!(response, Response::Closing(())) {
+            if matches!(response, Response::Closing) {
                 response.write_to(&mut stream).unwrap();
                 break;
             }
 
             response.write_to(&mut stream).unwrap();
-        } else if let Some(res) = state.handle_data_content(message) {
+        } else if let Some(res) = state.handle_data_content(&message) {
             res.write_to(&mut stream).unwrap();
         }
     }
