@@ -1,6 +1,7 @@
 use crate::response::CapabilityResponse;
 use util::EncodeTo;
 
+#[derive(Debug)]
 pub enum ServerResponse {
     Capability(CapabilityResponse),
 }

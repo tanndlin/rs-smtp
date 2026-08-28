@@ -46,7 +46,7 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Pos
     println!("Connection opened with peer: {addr}");
 
     // Send greeting
-    let mut state = IMAPState::new();
+    let mut state = IMAPState::default();
     let res = state.send_greeting();
     stream.write_all(&res.to_bytes()).unwrap();
 
@@ -62,6 +62,7 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Pos
                 bytes.drain(0..read);
                 dbg!(&command);
                 let res = state.handle_command(command);
+                dbg!(&res);
                 stream.write_all(&res.to_bytes()).unwrap();
             }
             Err(e) => todo!("{:?}", e),

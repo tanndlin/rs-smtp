@@ -66,4 +66,8 @@ async fn responds_to_capability() {
         resp.contains("a1 OK CAPABILITY completed"),
         "missing tagged completion: {resp:?}"
     );
+    assert!(
+        resp.ends_with("\r\n"),
+        "tagged completion line not CRLF-terminated: {resp:?}"
+    );
 }

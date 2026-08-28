@@ -4,6 +4,7 @@ use crate::{
 };
 use util::EncodeTo;
 
+#[derive(Debug)]
 pub struct CapabilityResponse {
     request_tag: String,
 }
@@ -19,7 +20,7 @@ impl EncodeTo for CapabilityResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {
         let tag = self.request_tag;
 
-        buf.extend(format!("* CAPABILITY IMAP4rev2\r\n{tag} OK CAPABILITY completed").bytes());
+        buf.extend(format!("* CAPABILITY IMAP4rev2\r\n{tag} OK CAPABILITY completed\r\n").bytes());
     }
 }
 

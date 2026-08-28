@@ -11,10 +11,6 @@ pub enum IMAPState {
 }
 
 impl IMAPState {
-    pub fn new() -> Self {
-        Self::Uninitialized
-    }
-
     pub fn send_greeting(&mut self) -> Greeting {
         *self = Self::NotAuthenticated;
         Greeting::new()
@@ -30,5 +26,11 @@ impl IMAPState {
             IMAPState::Authenticated => todo!(),
             IMAPState::Logout => todo!(),
         }
+    }
+}
+
+impl Default for IMAPState {
+    fn default() -> Self {
+        Self::Uninitialized
     }
 }
