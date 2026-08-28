@@ -1,13 +1,7 @@
 use util::EncodeTo;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Greeting {}
-
-impl Greeting {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
 
 impl EncodeTo for Greeting {
     fn encode_to(self, buf: &mut Vec<u8>) {

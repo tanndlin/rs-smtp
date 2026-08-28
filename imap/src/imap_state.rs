@@ -18,7 +18,7 @@ pub enum IMAPState {
 impl IMAPState {
     pub fn send_greeting(&mut self) -> Greeting {
         *self = Self::NotAuthenticated;
-        Greeting::new()
+        Greeting::default()
     }
 
     pub fn handle_command(&mut self, command: ClientCommand) -> ServerResponse {

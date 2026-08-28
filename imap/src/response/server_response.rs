@@ -16,7 +16,7 @@ impl EncodeTo for ServerResponse {
     }
 }
 
-pub trait ServerResponseTrait<T> {
+pub trait ServerResponseTrait<T>: EncodeTo {
     fn respond_to(cmd: T) -> Self;
 }
 
