@@ -1,10 +1,15 @@
-use crate::command::{CapabilityCommand, CommandParseError, LoginCommand, StartTLSCommand};
+use crate::{
+    command::{CapabilityCommand, ListCommand, LoginCommand, LogoutCommand, StartTLSCommand},
+    response::CommandParseError,
+};
 
 #[derive(Debug)]
 pub enum ClientCommand {
     Capability(CapabilityCommand),
     StartTLS(StartTLSCommand),
     Login(LoginCommand),
+    List(ListCommand),
+    Logout(LogoutCommand),
 }
 
 impl ClientCommand {
@@ -37,6 +42,8 @@ impl ClientCommand {
             "CAPABILITY" => CapabilityCommand::with_args(tag, &rest).into(),
             "STARTTLS" => StartTLSCommand::with_args(tag, &rest).into(),
             "LOGIN" => LoginCommand::with_args(tag, &rest).into(),
+            "LIST" => ListCommand::with_args(tag, &rest).into(),
+            "LOGOUT" => LogoutCommand::with_args(tag, &rest).into(),
             _ => todo!("Probably havent implemented {command_text} yet"),
         };
 

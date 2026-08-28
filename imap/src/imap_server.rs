@@ -1,13 +1,13 @@
 use std::{
     io::{Read, Write},
-    net::{SocketAddr, TcpListener, TcpStream},
+    net::{Shutdown, SocketAddr, TcpListener, TcpStream},
     sync::Arc,
     thread::{self},
 };
 
 use sqlx::{Pool, Postgres};
 
-use crate::{command::ClientCommand, imap_state::IMAPState};
+use crate::{command::ClientCommand, imap_session::IMAPSession};
 use util::EncodeTo;
 
 pub struct IMAPServer {
@@ -41,12 +41,12 @@ impl IMAPServer {
     }
 }
 
-fn handle_request(mut stream: TcpStream, addr: SocketAddr, _db_pool: Arc<Pool<Postgres>>) {
+fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Postgres>>) {
     #[cfg(debug_assertions)]
     println!("Connection opened with peer: {addr}");
 
     // Send greeting
-    let mut state = IMAPState::default();
+    let mut state = IMAPSession::new(db_pool);
     let res = state.send_greeting();
     stream.write_all(&res.to_bytes()).unwrap();
 
@@ -57,15 +57,24 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, _db_pool: Arc<Pool<Po
     {
         println!("Read {bytes_read} bytes");
         bytes.extend_from_slice(&buf[..bytes_read]);
-        match ClientCommand::parse_bytes(&bytes) {
-            Ok((command, read)) => {
-                bytes.drain(0..read);
-                dbg!(&command);
-                let res = state.handle_command(command);
-                dbg!(&res);
-                stream.write_all(&res.to_bytes()).unwrap();
+
+        // TODO: This will probably break for multiline commands
+        while bytes.windows(2).any(|window| window == b"\r\n") {
+            match ClientCommand::parse_bytes(&bytes) {
+                Ok((command, read)) => {
+                    bytes.drain(0..read);
+                    dbg!(&command);
+                    let res = state.handle_command(command);
+                    dbg!(&res);
+                    stream.write_all(&res.to_bytes()).unwrap();
+
+                    if state.is_logged_out() {
+                        let _ = stream.shutdown(Shutdown::Both);
+                        break;
+                    }
+                }
+                Err(e) => todo!("{:?}", e),
             }
-            Err(e) => todo!("{:?}", e),
         }
     }
 
