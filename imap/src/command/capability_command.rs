@@ -1,4 +1,7 @@
-use crate::command::{ClientCommand, client_command::ClientCommandTrait};
+use crate::{
+    client_command_from_impl,
+    command::{ClientCommand, client_command::ClientCommandTrait},
+};
 
 #[derive(Debug)]
 pub struct CapabilityCommand {
@@ -16,11 +19,7 @@ impl ClientCommandTrait for CapabilityCommand {
     }
 }
 
-impl From<CapabilityCommand> for ClientCommand {
-    fn from(cmd: CapabilityCommand) -> Self {
-        ClientCommand::Capability(cmd)
-    }
-}
+client_command_from_impl!(CapabilityCommand, Capability);
 
 #[cfg(test)]
 mod tests {

@@ -1,9 +1,10 @@
-use crate::command::{CapabilityCommand, CommandParseError, StartTLSCommand};
+use crate::command::{CapabilityCommand, CommandParseError, LoginCommand, StartTLSCommand};
 
 #[derive(Debug)]
 pub enum ClientCommand {
     Capability(CapabilityCommand),
     StartTLS(StartTLSCommand),
+    Login(LoginCommand),
 }
 
 impl ClientCommand {
@@ -32,16 +33,30 @@ impl ClientCommand {
 
         dbg!(&command_text);
 
-        match command_text {
-            "CAPABILITY" => Ok((CapabilityCommand::with_args(tag, &rest).into(), bytes_read)),
-            "STARTTLS" => Ok((StartTLSCommand::with_args(tag, &rest).into(), bytes_read)),
+        let cmd = match command_text {
+            "CAPABILITY" => CapabilityCommand::with_args(tag, &rest).into(),
+            "STARTTLS" => StartTLSCommand::with_args(tag, &rest).into(),
+            "LOGIN" => LoginCommand::with_args(tag, &rest).into(),
             _ => todo!("Probably havent implemented {command_text} yet"),
-        }
+        };
+
+        Ok((cmd, bytes_read))
     }
 }
 
 pub trait ClientCommandTrait {
     fn with_args(tag: String, args: &[String]) -> Self;
+}
+
+#[macro_export]
+macro_rules! client_command_from_impl {
+    ($type: tt,$variant: ident) => {
+        impl From<$type> for ClientCommand {
+            fn from(cmd: $type) -> Self {
+                ClientCommand::$variant(cmd)
+            }
+        }
+    };
 }
 
 #[cfg(test)]

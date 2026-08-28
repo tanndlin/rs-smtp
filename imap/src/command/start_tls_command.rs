@@ -1,4 +1,7 @@
-use crate::command::{ClientCommand, client_command::ClientCommandTrait};
+use crate::{
+    client_command_from_impl,
+    command::{ClientCommand, client_command::ClientCommandTrait},
+};
 
 #[derive(Debug)]
 pub struct StartTLSCommand {
@@ -15,8 +18,4 @@ impl ClientCommandTrait for StartTLSCommand {
     }
 }
 
-impl From<StartTLSCommand> for ClientCommand {
-    fn from(cmd: StartTLSCommand) -> Self {
-        ClientCommand::StartTLS(cmd)
-    }
-}
+client_command_from_impl!(StartTLSCommand, StartTLS);
