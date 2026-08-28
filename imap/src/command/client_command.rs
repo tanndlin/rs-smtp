@@ -1,7 +1,7 @@
 use crate::{
     command::{
-        CapabilityCommand, ListCommand, LoginCommand, LogoutCommand, StartTLSCommand,
-        StatusCommand, select_command::SelectCommand,
+        CapabilityCommand, FetchCommand, ListCommand, LoginCommand, LogoutCommand, SelectCommand,
+        StartTLSCommand, StatusCommand,
     },
     response::CommandParseError,
 };
@@ -14,6 +14,7 @@ pub enum ClientCommand {
     List(ListCommand),
     Select(SelectCommand),
     Status(StatusCommand),
+    Fetch(FetchCommand),
     Logout(LogoutCommand),
 }
 
@@ -50,6 +51,7 @@ impl ClientCommand {
             "LIST" => ListCommand::with_args(tag, &rest).into(),
             "SELECT" => SelectCommand::with_args(tag, &rest).into(),
             "STATUS" => StatusCommand::with_args(tag, &rest).into(),
+            "FETCH" => FetchCommand::with_args(tag, &rest).into(),
             "LOGOUT" => LogoutCommand::with_args(tag, &rest).into(),
             _ => todo!("Probably havent implemented {command_text} yet"),
         };

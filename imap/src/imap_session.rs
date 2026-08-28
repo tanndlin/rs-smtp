@@ -3,7 +3,9 @@ use std::sync::Arc;
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    command::{ClientCommand, ListCommand, LogoutCommand, SelectCommand, StatusCommand},
+    command::{
+        ClientCommand, FetchCommand, ListCommand, LogoutCommand, SelectCommand, StatusCommand,
+    },
     response::{
         CapabilityResponse, Greeting, ListResponse, LoginResponse, LoginResult, LogoutResponse,
         MailboxListEntry, SelectResponse, ServerResponse, ServerResponseTrait, StatusResponse,
@@ -59,19 +61,21 @@ impl IMAPSession {
                         LoginResult::No => res.into(),
                     }
                 }
-                ClientCommand::List(_) => todo!("This should return an error"),
-                ClientCommand::Select(_) => todo!("This should return an error"),
-                ClientCommand::Status(_) => todo!("This should return an error"),
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
+                ClientCommand::List(_)
+                | ClientCommand::Select(_)
+                | ClientCommand::Status(_)
+                | ClientCommand::Fetch(_) => todo!("This should return an error"),
             },
             SessionState::Authenticated => match command {
-                ClientCommand::Capability(_) => todo!("This should return an error"),
-                ClientCommand::StartTLS(_) => todo!("This should return an error"),
-                ClientCommand::Login(_) => todo!("This should return an error"),
                 ClientCommand::List(cmd) => self.handle_list_command(cmd),
                 ClientCommand::Select(cmd) => self.handle_select_command(cmd).await,
                 ClientCommand::Status(cmd) => self.handle_status_command(cmd).await,
+                ClientCommand::Fetch(cmd) => self.handle_fetch_command(cmd).await,
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
+                ClientCommand::Capability(_)
+                | ClientCommand::StartTLS(_)
+                | ClientCommand::Login(_) => todo!("This should return an error"),
             },
             SessionState::Logout => panic!("Received command after LOGOUT"),
         }
@@ -177,5 +181,9 @@ impl IMAPSession {
         let deleted = if cmd.deleted { Some(0) } else { None };
 
         StatusResponse::new(cmd, messages, next_uid, validity_uid, unseen, deleted).into()
+    }
+
+    async fn handle_fetch_command(&self, cmd: FetchCommand) -> ServerResponse {
+        todo!()
     }
 }

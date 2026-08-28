@@ -1,5 +1,6 @@
 mod capability_command;
 mod client_command;
+mod fetch_command;
 mod list_command;
 mod login_command;
 mod logout_command;
@@ -9,6 +10,7 @@ mod status_command;
 
 pub use capability_command::CapabilityCommand;
 pub use client_command::ClientCommand;
+pub use fetch_command::FetchCommand;
 pub use list_command::ListCommand;
 pub use login_command::LoginCommand;
 pub use logout_command::LogoutCommand;
