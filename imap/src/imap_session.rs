@@ -3,10 +3,10 @@ use std::sync::Arc;
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    command::{ClientCommand, ListCommand, LogoutCommand, SelectCommand},
+    command::{ClientCommand, ListCommand, LogoutCommand, SelectCommand, StatusCommand},
     response::{
         CapabilityResponse, Greeting, ListResponse, LoginResponse, LoginResult, LogoutResponse,
-        MailboxListEntry, SelectResponse, ServerResponse, ServerResponseTrait,
+        MailboxListEntry, SelectResponse, ServerResponse, ServerResponseTrait, StatusResponse,
     },
 };
 
@@ -61,6 +61,7 @@ impl IMAPSession {
                 }
                 ClientCommand::List(_) => todo!("This should return an error"),
                 ClientCommand::Select(_) => todo!("This should return an error"),
+                ClientCommand::Status(_) => todo!("This should return an error"),
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
             },
             SessionState::Authenticated => match command {
@@ -69,6 +70,7 @@ impl IMAPSession {
                 ClientCommand::Login(_) => todo!("This should return an error"),
                 ClientCommand::List(cmd) => self.handle_list_command(cmd),
                 ClientCommand::Select(cmd) => self.handle_select_command(cmd).await,
+                ClientCommand::Status(cmd) => self.handle_status_command(cmd).await,
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
             },
             SessionState::Logout => panic!("Received command after LOGOUT"),
@@ -107,9 +109,73 @@ impl IMAPSession {
             .unwrap_or(0);
         let next_uid = max_id as u64 + 1;
 
-        // TODO: real UIDVALIDITY needs per-mailbox metadata; fixed until then.
-        let validity_uid = 1;
+        let validity_uid = sqlx::query_scalar!(
+            "SELECT uid_validity FROM mailboxes WHERE name = $1",
+            self.selected_mailbox
+        )
+        .fetch_one(&*self.db_pool)
+        .await
+        .unwrap() as u64;
 
         SelectResponse::new(cmd, exists, next_uid, validity_uid).into()
+    }
+
+    async fn handle_status_command(&mut self, cmd: StatusCommand) -> ServerResponse {
+        assert!(cmd.mailbox == "INBOX");
+
+        let messages = if cmd.messages {
+            Some(
+                sqlx::query_scalar!("SELECT COUNT(*) FROM mail")
+                    .fetch_one(&*self.db_pool)
+                    .await
+                    .expect("failed to query mailbox message count")
+                    .unwrap_or(0) as u64,
+            )
+        } else {
+            None
+        };
+
+        let next_uid = if cmd.next_uid {
+            let max_id = sqlx::query_scalar!("SELECT MAX(uid) FROM mail")
+                .fetch_one(&*self.db_pool)
+                .await
+                .expect("failed to query max mail id")
+                .unwrap_or(0) as u64;
+            Some(max_id + 1)
+        } else {
+            None
+        };
+
+        let validity_uid = if cmd.validity_uid {
+            Some(
+                sqlx::query_scalar!(
+                    "SELECT uid_validity FROM mailboxes WHERE name = $1",
+                    self.selected_mailbox
+                )
+                .fetch_one(&*self.db_pool)
+                .await
+                .unwrap() as u64,
+            )
+        } else {
+            None
+        };
+
+        //TODO: After flags are added, this needs to be counted
+        let unseen = if cmd.unseen {
+            Some(
+                sqlx::query_scalar!("SELECT COUNT(*) FROM mail")
+                    .fetch_one(&*self.db_pool)
+                    .await
+                    .expect("failed to query mailbox message count")
+                    .unwrap_or(0) as u64,
+            )
+        } else {
+            None
+        };
+
+        //TODO: After flags are added, this needs to be counted
+        let deleted = if cmd.deleted { Some(0) } else { None };
+
+        StatusResponse::new(cmd, messages, next_uid, validity_uid, unseen, deleted).into()
     }
 }

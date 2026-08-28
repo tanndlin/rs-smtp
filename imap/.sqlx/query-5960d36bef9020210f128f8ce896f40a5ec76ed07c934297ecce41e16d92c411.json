@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT uid_validity FROM mailboxes WHERE name = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uid_validity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "mailboxes",
+            "name": "uid_validity"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5960d36bef9020210f128f8ce896f40a5ec76ed07c934297ecce41e16d92c411"
+}
