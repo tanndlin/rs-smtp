@@ -13,8 +13,8 @@ pub struct LoginCommand {
 impl ClientCommandTrait for LoginCommand {
     fn with_args(tag: String, args: &[String]) -> Self {
         assert!(args.len() == 2);
-        let user = args[0].clone();
-        let pass = args[1].clone();
+        let user = args[0].trim_matches('"').to_string();
+        let pass = args[1].trim_matches('"').to_string();
 
         Self { tag, user, pass }
     }

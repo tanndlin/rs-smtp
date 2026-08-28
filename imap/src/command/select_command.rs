@@ -13,7 +13,7 @@ impl ClientCommandTrait for SelectCommand {
     fn with_args(tag: String, args: &[String]) -> Self {
         dbg!(args);
         assert!(args.len() == 1);
-        let mailbox = args[0].clone().trim_matches('"').to_string();
+        let mailbox = args[0].trim_matches('"').to_string();
 
         Self { tag, mailbox }
     }
