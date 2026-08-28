@@ -86,8 +86,21 @@ async fn main() {
         println!("----------------- Body -----------------");
         println!("{}", email.body);
 
+        let mut tx = db_pool.begin().await.unwrap();
+        let uid = sqlx::query_scalar!(
+            "UPDATE mailboxes SET uid_next = uid_next + 1 WHERE name = $1 RETURNING (uid_next - 1) AS \"uid!\"",
+            "INBOX",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+
         let result = sqlx::query!(
-            "INSERT INTO mail (sender, recipient_to, recipient_cc, subject, sent_date, body_text, raw_eml) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            "INSERT INTO mail (mailbox_id, uid, message_id, sender, recipient_to, recipient_cc, subject, sent_date, body_text, raw_eml) \
+             VALUES ((SELECT id FROM mailboxes WHERE name = $1), $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            "INBOX",
+            uid,
+            email.message_id,
             email.sender,
             email.recipients_to.join(";"),
             email.recipients_cc.join(";"),
@@ -96,11 +109,19 @@ async fn main() {
             email.body,
             email.raw,
         )
-        .execute(&db_pool)
+        .execute(&mut *tx)
         .await;
 
-        if let Err(err) = result {
-            eprintln!("Failed to insert mail into database: {err}");
+        match result {
+            Ok(_) => {
+                if let Err(err) = tx.commit().await {
+                    eprintln!("Failed to commit mail transaction: {err}");
+                }
+            }
+            Err(err) => {
+                eprintln!("Failed to insert mail into database: {err}");
+                let _ = tx.rollback().await;
+            }
         }
 
         delivery

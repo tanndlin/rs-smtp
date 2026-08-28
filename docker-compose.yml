@@ -71,13 +71,17 @@ services:
       retries: 3
 
   imap:
-    build: ./imap
+    build:
+      context: .
+      dockerfile: imap/Dockerfile
     container_name: tmail-imap-server
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    ports:
+      - "143:143"
     networks:
       - tmail-network
     environment:
@@ -89,11 +93,13 @@ services:
         - action: rebuild
           path: ./imap/src
         - action: rebuild
-          path: ./imap/migrations
+          path: ./util/src
+        - action: rebuild
+          path: ./migrations
         - action: rebuild
           path: ./imap/Cargo.toml
         - action: rebuild
-          path: ./imap/Cargo.lock
+          path: ./Cargo.lock
 
   smtp:
     build:

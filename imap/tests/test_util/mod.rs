@@ -10,7 +10,6 @@
 use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 
 use imap::imap_server::IMAPServer;
@@ -21,14 +20,14 @@ use sqlx::postgres::PgPoolOptions;
 ///
 /// The pool is built lazily against a bogus URL: nothing in the request path
 /// touches the database yet, and `connect_lazy` opens no connection.
-pub fn start_server() -> SocketAddr {
+pub async fn start_server() -> SocketAddr {
     let pool = PgPoolOptions::new()
         .connect_lazy("postgres://unused")
         .expect("failed to build lazy pool");
 
-    let server = IMAPServer::new("127.0.0.1:0".parse().unwrap(), Arc::new(pool));
+    let server = IMAPServer::new("127.0.0.1:0".parse().unwrap(), Arc::new(pool)).await;
     let addr = server.local_addr().expect("no local addr");
-    thread::spawn(move || server.start());
+    tokio::spawn(async move { server.start().await });
     addr
 }
 

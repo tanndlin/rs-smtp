@@ -1,11 +1,10 @@
-use std::{
-    io::{Read, Write},
-    net::{Shutdown, SocketAddr, TcpListener, TcpStream},
-    sync::Arc,
-    thread::{self},
-};
+use std::{net::SocketAddr, sync::Arc};
 
 use sqlx::{Pool, Postgres};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+};
 
 use crate::{command::ClientCommand, imap_session::IMAPSession};
 use util::EncodeTo;
@@ -16,8 +15,9 @@ pub struct IMAPServer {
 }
 
 impl IMAPServer {
-    pub fn new(ip: SocketAddr, db_pool: Arc<Pool<Postgres>>) -> Self {
+    pub async fn new(ip: SocketAddr, db_pool: Arc<Pool<Postgres>>) -> Self {
         let listener = TcpListener::bind(ip)
+            .await
             .map_err(|e| format!("Error creating tcp listener {e}"))
             .unwrap();
 
@@ -32,27 +32,27 @@ impl IMAPServer {
         self.listener.local_addr()
     }
 
-    pub fn start(&self) {
+    pub async fn start(&self) {
         loop {
-            let (stream, addr) = self.listener.accept().unwrap();
+            let (stream, addr) = self.listener.accept().await.unwrap();
             let db_pool = self.db_pool.clone();
-            thread::spawn(move || handle_request(stream, addr, db_pool));
+            tokio::spawn(handle_request(stream, addr, db_pool));
         }
     }
 }
 
-fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Postgres>>) {
+async fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Postgres>>) {
     #[cfg(debug_assertions)]
     println!("Connection opened with peer: {addr}");
 
     // Send greeting
     let mut state = IMAPSession::new(db_pool);
     let res = state.send_greeting();
-    stream.write_all(&res.to_bytes()).unwrap();
+    stream.write_all(&res.to_bytes()).await.unwrap();
 
     let mut bytes = vec![];
     let mut buf = [0; 4096];
-    while let Ok(bytes_read) = stream.read(&mut buf)
+    while let Ok(bytes_read) = stream.read(&mut buf).await
         && bytes_read > 0
     {
         println!("Read {bytes_read} bytes");
@@ -64,12 +64,12 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Pool<Pos
                 Ok((command, read)) => {
                     bytes.drain(0..read);
                     dbg!(&command);
-                    let res = state.handle_command(command);
+                    let res = state.handle_command(command).await;
                     dbg!(&res);
-                    stream.write_all(&res.to_bytes()).unwrap();
+                    stream.write_all(&res.to_bytes()).await.unwrap();
 
                     if state.is_logged_out() {
-                        let _ = stream.shutdown(Shutdown::Both);
+                        let _ = stream.shutdown().await;
                         break;
                     }
                 }

@@ -1,5 +1,6 @@
 use crate::response::{
-    CapabilityResponse, ListResponse, LoginResponse, LogoutResponse, ServerErrorResponse,
+    CapabilityResponse, ListResponse, LoginResponse, LogoutResponse, SelectResponse,
+    ServerErrorResponse,
 };
 use util::EncodeTo;
 
@@ -10,6 +11,7 @@ pub enum ServerResponse {
     List(ListResponse),
     Logout(LogoutResponse),
     Error(ServerErrorResponse),
+    Select(SelectResponse),
 }
 
 impl EncodeTo for ServerResponse {
@@ -20,6 +22,7 @@ impl EncodeTo for ServerResponse {
             ServerResponse::Error(res) => res.encode_to(buf),
             ServerResponse::List(res) => res.encode_to(buf),
             ServerResponse::Logout(res) => res.encode_to(buf),
+            ServerResponse::Select(res) => res.encode_to(buf),
         }
     }
 }

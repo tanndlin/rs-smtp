@@ -21,6 +21,6 @@ async fn main() {
 
     println!("Database connected and migrations applied.");
 
-    let imap_server = IMAPServer::new(ip, Arc::new(db_pool));
-    imap_server.start();
+    let imap_server = IMAPServer::new(ip, Arc::new(db_pool)).await;
+    imap_server.start().await;
 }
