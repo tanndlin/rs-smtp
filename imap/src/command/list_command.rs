@@ -9,8 +9,10 @@ pub struct ListCommand {
 }
 
 impl ClientCommandTrait for ListCommand {
-    // TODO: Actually parse list
-    fn with_args(tag: String, args: &[String]) -> Self {
+    // TODO: Actually parse LIST
+    fn parse_bytes(tag: String, cursor: &mut crate::cursor::Cursor) -> Self {
+        cursor.eat(b'\r');
+        cursor.eat(b'\n');
         Self { tag }
     }
 }

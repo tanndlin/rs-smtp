@@ -9,12 +9,9 @@ pub struct CapabilityCommand {
 }
 
 impl ClientCommandTrait for CapabilityCommand {
-    fn with_args(tag: String, args: &[String]) -> Self {
-        dbg!(args);
-        if !args.is_empty() {
-            panic!();
-        }
-
+    fn parse_bytes(tag: String, cursor: &mut crate::cursor::Cursor) -> Self {
+        cursor.eat(b'\r');
+        cursor.eat(b'\n');
         Self { tag }
     }
 }

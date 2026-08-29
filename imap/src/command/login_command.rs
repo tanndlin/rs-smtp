@@ -1,6 +1,7 @@
 use crate::{
     client_command_from_impl,
     command::{ClientCommand, client_command::ClientCommandTrait},
+    cursor::Cursor,
 };
 
 #[derive(Debug)]
@@ -11,10 +12,9 @@ pub struct LoginCommand {
 }
 
 impl ClientCommandTrait for LoginCommand {
-    fn with_args(tag: String, args: &[String]) -> Self {
-        assert!(args.len() == 2);
-        let user = args[0].trim_matches('"').to_string();
-        let pass = args[1].trim_matches('"').to_string();
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self {
+        let user = cursor.atom().unwrap().to_string();
+        let pass = cursor.atom().unwrap().to_string();
 
         Self { tag, user, pass }
     }

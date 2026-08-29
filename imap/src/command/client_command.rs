@@ -30,7 +30,6 @@ impl ClientCommand {
                 CommandParseError::MalformedCommand
             })?
             .to_string();
-        cursor.skip_sp();
         let command_text = cursor.atom().map_err(|e| {
             eprintln!("{:?}", e);
             CommandParseError::MalformedCommand

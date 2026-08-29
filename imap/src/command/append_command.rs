@@ -1,6 +1,7 @@
 use crate::{
     client_command_from_impl,
     command::{ClientCommand, client_command::ClientCommandTrait},
+    cursor::Cursor,
 };
 
 #[derive(Debug)]
@@ -9,27 +10,52 @@ pub struct AppendCommand {
     pub mailbox: String,
     pub flags: Vec<String>,
     pub date_time: Option<String>,
-    pub message: Vec<u8>,
+    pub message: Option<Vec<u8>>,
 }
 
 impl ClientCommandTrait for AppendCommand {
-    fn with_args(tag: String, args: &[String]) -> Self {
-        let mailbox = args[0].clone();
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self {
+        let mailbox = cursor.atom().unwrap().to_string();
 
-        let length: usize = args
-            .last()
-            .unwrap()
-            .trim_start_matches('{')
-            .trim_end_matches('}')
-            .parse()
-            .unwrap(); // TODO: Handle the +
+        // TODO: Any error will assume it meant empty flags
+        let flags = cursor
+            .paren_list(|c| c.atom().map(|s| s.to_string()))
+            .unwrap_or_default();
+
+        let date_time = match cursor.string() {
+            Ok(date_time) => Some(date_time.to_string()),
+            Err(_) => None,
+        };
+
+        let (length, sending_now) = {
+            let length = cursor
+                .atom()
+                .unwrap()
+                .trim_start_matches('{')
+                .trim_end_matches('}');
+            let sending_now = length.contains('+');
+            let length = length.trim_end_matches('+').parse().unwrap();
+            (length, sending_now)
+        };
+
+        cursor.eat(b'\r').unwrap();
+        cursor.eat(b'\n').unwrap();
+
+        let message = if sending_now {
+            let message = cursor.raw(length);
+            cursor.eat(b'\r').unwrap();
+            cursor.eat(b'\n').unwrap();
+            Some(message)
+        } else {
+            None
+        };
 
         Self {
             tag,
             mailbox,
-            flags: vec![],
-            date_time: None,
-            message: vec![],
+            flags,
+            date_time,
+            message,
         }
     }
 }

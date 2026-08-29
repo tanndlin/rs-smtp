@@ -9,9 +9,9 @@ pub struct LogoutCommand {
 }
 
 impl ClientCommandTrait for LogoutCommand {
-    fn with_args(tag: String, args: &[String]) -> Self {
-        assert!(args.is_empty());
-
+    fn parse_bytes(tag: String, cursor: &mut crate::cursor::Cursor) -> Self {
+        cursor.eat(b'\r');
+        cursor.eat(b'\n');
         Self { tag }
     }
 }

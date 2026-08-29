@@ -15,6 +15,12 @@ impl<'a> Cursor<'a> {
     }
 
     pub fn eat(&mut self, b: u8) -> Result<(), ParseError> {
+        if let Some(c) = self.peek()
+            && c == b' '
+        {
+            self.skip_sp();
+        }
+
         if self.peek().ok_or(ParseError::OutOfBytes)? != b {
             return Err(ParseError::UnexpectedChar);
         }
@@ -22,11 +28,17 @@ impl<'a> Cursor<'a> {
         Ok(())
     }
 
-    pub fn skip_sp(&mut self) {
+    fn skip_sp(&mut self) {
         self.pos += 1;
     }
 
     pub fn atom(&mut self) -> Result<&'a str, ParseError> {
+        if let Some(c) = self.peek()
+            && c == b' '
+        {
+            self.skip_sp();
+        }
+
         let start = self.pos;
         while self.peek().is_some_and(is_atom_char) {
             self.pos += 1;
@@ -38,6 +50,12 @@ impl<'a> Cursor<'a> {
     }
 
     pub fn string(&mut self) -> Result<Cow<'a, str>, ParseError> {
+        if let Some(c) = self.peek()
+            && c == b' '
+        {
+            self.skip_sp();
+        }
+
         self.eat(b'"')?;
         let start = self.pos;
         while self.peek().ok_or(ParseError::OutOfBytes)? != b'"' {
@@ -53,13 +71,19 @@ impl<'a> Cursor<'a> {
     }
 
     pub fn number(&mut self) -> Result<u64, ParseError> {
-        if !is_ascii_number(self.peek().ok_or(ParseError::OutOfBytes)?) {
+        if let Some(c) = self.peek()
+            && c == b' '
+        {
+            self.skip_sp();
+        }
+
+        if !(self.peek().ok_or(ParseError::OutOfBytes)?.is_ascii_digit()) {
             return Err(ParseError::ExpectedNumber);
         }
 
         let mut n = 0u64;
         while let Some(c) = self.peek()
-            && is_ascii_number(c)
+            && c.is_ascii_digit()
         {
             n *= 10;
             n += (c - b'0') as u64;
@@ -73,6 +97,12 @@ impl<'a> Cursor<'a> {
         &mut self,
         mut f: impl FnMut(&mut Self) -> Result<T, ParseError>,
     ) -> Result<Vec<T>, ParseError> {
+        if let Some(c) = self.peek()
+            && c == b' '
+        {
+            self.skip_sp();
+        }
+
         self.eat(b'(')?;
 
         let mut items = vec![];
@@ -89,10 +119,12 @@ impl<'a> Cursor<'a> {
         self.eat(b')')?;
         Ok(items)
     }
-}
 
-fn is_ascii_number(c: u8) -> bool {
-    c >= b'0' && c <= b'9'
+    pub fn raw(&mut self, amount: usize) -> Vec<u8> {
+        let slice = self.buf[self.pos..self.pos + amount].to_vec();
+        self.pos += amount;
+        slice
+    }
 }
 
 fn is_atom_char(b: u8) -> bool {
@@ -100,7 +132,7 @@ fn is_atom_char(b: u8) -> bool {
 }
 
 #[derive(Debug)]
-enum ParseError {
+pub enum ParseError {
     OutOfBytes,
     ExpectedAtom,
     UnexpectedChar,

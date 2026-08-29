@@ -1,8 +1,9 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, iter::Map, str::FromStr};
 
 use crate::{
     client_command_from_impl,
     command::{ClientCommand, client_command::ClientCommandTrait},
+    cursor::Cursor,
 };
 
 #[derive(Debug)]
@@ -377,18 +378,20 @@ impl FromStr for Partial {
 }
 
 impl ClientCommandTrait for FetchCommand {
-    fn with_args(tag: String, args: &[String]) -> Self {
-        assert!(args.len() >= 2);
-
-        let sequence = Sequence::from_str(&args[0]).unwrap();
-
-        // args[0] is the sequence set; the rest are the fetch items.
-        let args = args[1..]
-            .iter()
-            .map(|a| a.trim_start_matches('(').trim_end_matches(')'));
-
-        // Either a single Fetchable, or a paranthesized list of Fetchables
-        let fetch_list = args.map(Fetchable::from_str).map(|f| f.unwrap()).collect();
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self {
+        let sequence = Sequence::from_str(cursor.atom().unwrap()).unwrap();
+        let fetch_list = match cursor
+            .paren_list(|c| c.atom())
+            .map(|v| v.iter().map(|f| Fetchable::from_str(f).unwrap()).collect())
+        {
+            Ok(fetch_list) => fetch_list,
+            Err(_) => vec![
+                cursor
+                    .atom()
+                    .map(|f| Fetchable::from_str(f).unwrap())
+                    .unwrap(),
+            ],
+        };
 
         Self {
             tag,
@@ -406,6 +409,24 @@ mod tests {
 
     #[test]
     fn parses_basic_fetch() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 BODY\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        assert!(matches!(
+            cmd.sequence,
+            Sequence::Single(FetchIndicator::Index(1))
+        ));
+        assert!(cmd.fetch_list.len() == 1);
+        assert!(matches!(
+            cmd.fetch_list[0],
+            Fetchable::Body(BodyFetchable::Full)
+        ));
+    }
+
+    #[test]
+    fn parses_single_sequence() {
         let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 BODY\r\n").unwrap();
         let ClientCommand::Fetch(cmd) = cmd else {
             panic!("expected ClientCommand::Fetch, got {cmd:?}");
