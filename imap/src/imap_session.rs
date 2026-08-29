@@ -16,6 +16,7 @@ pub struct IMAPSession {
     db_pool: Arc<Pool<Postgres>>,
     auth_state: SessionState,
     selected_mailbox: Option<String>,
+    expecting_append_mail: bool,
 }
 
 #[derive(Default)]
@@ -33,6 +34,7 @@ impl IMAPSession {
             db_pool,
             auth_state: SessionState::default(),
             selected_mailbox: None,
+            expecting_append_mail: false,
         }
     }
 
@@ -65,13 +67,15 @@ impl IMAPSession {
                 ClientCommand::List(_)
                 | ClientCommand::Select(_)
                 | ClientCommand::Status(_)
-                | ClientCommand::Fetch(_) => todo!("This should return an error"),
+                | ClientCommand::Fetch(_)
+                | ClientCommand::Append(_) => todo!("This should return an error"),
             },
             SessionState::Authenticated => match command {
                 ClientCommand::List(cmd) => self.handle_list_command(cmd),
                 ClientCommand::Select(cmd) => self.handle_select_command(cmd).await,
                 ClientCommand::Status(cmd) => self.handle_status_command(cmd).await,
                 ClientCommand::Fetch(cmd) => self.handle_fetch_command(cmd).await,
+                ClientCommand::Append(_) => todo!("APPEND command is not implemented"),
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
                 ClientCommand::Capability(_)
                 | ClientCommand::StartTLS(_)

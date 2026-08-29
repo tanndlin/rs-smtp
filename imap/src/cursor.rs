@@ -1,0 +1,108 @@
+use std::borrow::Cow;
+
+pub struct Cursor<'a> {
+    buf: &'a [u8],
+    pub pos: usize,
+}
+
+impl<'a> Cursor<'a> {
+    pub fn new(buf: &'a [u8]) -> Self {
+        Self { buf, pos: 0 }
+    }
+
+    fn peek(&self) -> Option<u8> {
+        self.buf.get(self.pos).copied()
+    }
+
+    pub fn eat(&mut self, b: u8) -> Result<(), ParseError> {
+        if self.peek().ok_or(ParseError::OutOfBytes)? != b {
+            return Err(ParseError::UnexpectedChar);
+        }
+        self.pos += 1;
+        Ok(())
+    }
+
+    pub fn skip_sp(&mut self) {
+        self.pos += 1;
+    }
+
+    pub fn atom(&mut self) -> Result<&'a str, ParseError> {
+        let start = self.pos;
+        while self.peek().is_some_and(is_atom_char) {
+            self.pos += 1;
+        }
+        if self.pos == start {
+            return Err(ParseError::ExpectedAtom);
+        }
+        Ok(std::str::from_utf8(&self.buf[start..self.pos]).unwrap()) // bytes are all ASCII
+    }
+
+    pub fn string(&mut self) -> Result<Cow<'a, str>, ParseError> {
+        self.eat(b'"')?;
+        let start = self.pos;
+        while self.peek().ok_or(ParseError::OutOfBytes)? != b'"' {
+            self.pos += 1
+        }
+
+        self.eat(b'"')?;
+        let end = self.pos;
+
+        Ok(Cow::Borrowed(
+            str::from_utf8(&self.buf[start..end]).unwrap(),
+        ))
+    }
+
+    pub fn number(&mut self) -> Result<u64, ParseError> {
+        if !is_ascii_number(self.peek().ok_or(ParseError::OutOfBytes)?) {
+            return Err(ParseError::ExpectedNumber);
+        }
+
+        let mut n = 0u64;
+        while let Some(c) = self.peek()
+            && is_ascii_number(c)
+        {
+            n *= 10;
+            n += (c - b'0') as u64;
+            self.pos += 1;
+        }
+
+        Ok(n)
+    }
+
+    pub fn paren_list<T>(
+        &mut self,
+        mut f: impl FnMut(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<Vec<T>, ParseError> {
+        self.eat(b'(')?;
+
+        let mut items = vec![];
+
+        while self.peek().ok_or(ParseError::OutOfBytes)? != b')' {
+            let start = self.pos;
+            while self.peek().ok_or(ParseError::OutOfBytes)? != b' ' {
+                self.pos + 1;
+            }
+
+            items.push(f(self)?);
+        }
+
+        self.eat(b')')?;
+        Ok(items)
+    }
+}
+
+fn is_ascii_number(c: u8) -> bool {
+    c >= b'0' && c <= b'9'
+}
+
+fn is_atom_char(b: u8) -> bool {
+    matches!(b, 0x21..=0x7E) && !matches!(b, b'(' | b')' | b'{' | b'%' | b'*' | b'"' | b'\\' | b']')
+}
+
+#[derive(Debug)]
+enum ParseError {
+    OutOfBytes,
+    ExpectedAtom,
+    UnexpectedChar,
+    ExpectedNumber,
+}

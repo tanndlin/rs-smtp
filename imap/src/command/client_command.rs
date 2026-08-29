@@ -1,8 +1,9 @@
 use crate::{
     command::{
-        CapabilityCommand, FetchCommand, ListCommand, LoginCommand, LogoutCommand, SelectCommand,
-        StartTLSCommand, StatusCommand,
+        AppendCommand, CapabilityCommand, FetchCommand, ListCommand, LoginCommand, LogoutCommand,
+        SelectCommand, StartTLSCommand, StatusCommand,
     },
+    cursor::Cursor,
     response::CommandParseError,
 };
 
@@ -15,53 +16,46 @@ pub enum ClientCommand {
     Select(SelectCommand),
     Status(StatusCommand),
     Fetch(FetchCommand),
+    Append(AppendCommand),
     Logout(LogoutCommand),
 }
 
 impl ClientCommand {
     pub fn parse_bytes(buf: &[u8]) -> Result<(Self, usize), CommandParseError> {
-        let str = str::from_utf8(buf).unwrap();
-        dbg!(str);
-        let lines = str.split("\r\n").collect::<Vec<_>>();
-        let line = lines[0];
-        println!("Got line: {:?}", line);
-
-        let mut split = line.splitn(3, " ");
-        let tag = split
-            .next()
-            .ok_or(CommandParseError::MalformedCommand)?
+        let mut cursor = Cursor::new(buf);
+        let tag = cursor
+            .atom()
+            .map_err(|e| {
+                eprintln!("{:?}", e);
+                CommandParseError::MalformedCommand
+            })?
             .to_string();
-        let command_text = split.next().ok_or(CommandParseError::MalformedCommand)?;
-        let rest = split
-            .next()
-            .unwrap_or_default()
-            .split(" ")
-            .map(|s| s.to_string())
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>();
-
-        let bytes_read = line.len() + 2; // +2 for the \r\n. TODO: This might not always be the case
-
-        dbg!(&command_text);
+        cursor.skip_sp();
+        let command_text = cursor.atom().map_err(|e| {
+            eprintln!("{:?}", e);
+            CommandParseError::MalformedCommand
+        })?;
 
         let cmd = match command_text {
-            "CAPABILITY" => CapabilityCommand::with_args(tag, &rest).into(),
-            "STARTTLS" => StartTLSCommand::with_args(tag, &rest).into(),
-            "LOGIN" => LoginCommand::with_args(tag, &rest).into(),
-            "LIST" => ListCommand::with_args(tag, &rest).into(),
-            "SELECT" => SelectCommand::with_args(tag, &rest).into(),
-            "STATUS" => StatusCommand::with_args(tag, &rest).into(),
-            "FETCH" => FetchCommand::with_args(tag, &rest).into(),
-            "LOGOUT" => LogoutCommand::with_args(tag, &rest).into(),
+            "CAPABILITY" => CapabilityCommand::parse_bytes(tag, &mut cursor).into(),
+            "STARTTLS" => StartTLSCommand::parse_bytes(tag, &mut cursor).into(),
+            "LOGIN" => LoginCommand::parse_bytes(tag, &mut cursor).into(),
+            "LIST" => ListCommand::parse_bytes(tag, &mut cursor).into(),
+            "SELECT" => SelectCommand::parse_bytes(tag, &mut cursor).into(),
+            "STATUS" => StatusCommand::parse_bytes(tag, &mut cursor).into(),
+            "FETCH" => FetchCommand::parse_bytes(tag, &mut cursor).into(),
+            "APPEND" => AppendCommand::parse_bytes(tag, &mut cursor).into(),
+            "LOGOUT" => LogoutCommand::parse_bytes(tag, &mut cursor).into(),
             _ => todo!("Probably havent implemented {command_text} yet"),
         };
 
+        let bytes_read = cursor.pos;
         Ok((cmd, bytes_read))
     }
 }
 
 pub trait ClientCommandTrait {
-    fn with_args(tag: String, args: &[String]) -> Self;
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self;
 }
 
 #[macro_export]

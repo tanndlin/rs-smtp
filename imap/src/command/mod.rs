@@ -1,3 +1,4 @@
+mod append_command;
 mod capability_command;
 mod client_command;
 mod fetch_command;
@@ -8,6 +9,7 @@ mod select_command;
 mod start_tls_command;
 mod status_command;
 
+pub use append_command::AppendCommand;
 pub use capability_command::CapabilityCommand;
 pub use client_command::ClientCommand;
 pub use fetch_command::FetchCommand;
