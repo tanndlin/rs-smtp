@@ -105,9 +105,17 @@ impl<'a> Cursor<'a> {
             self.skip_sp();
         }
 
+        // Support a single non parenthesized item
+        if let next = self.peek().ok_or(ParseError::OutOfBytes)?
+            && is_atom_char(next)
+        {
+            return Ok(vec![f(self)?]);
+        };
+
         self.eat(b'(')?;
 
         let mut items = vec![];
+        items.push(f(self)?);
 
         while self.peek().ok_or(ParseError::OutOfBytes)? != b')' {
             while self.peek().ok_or(ParseError::OutOfBytes)? != b' ' {
