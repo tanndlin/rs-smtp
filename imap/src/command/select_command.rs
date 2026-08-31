@@ -27,4 +27,16 @@ client_command_from_impl!(SelectCommand, Select);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_mailbox() {
+        let (ClientCommand::Select(cmd), _) =
+            ClientCommand::parse_bytes(b"a69 SELECT INBOX").unwrap()
+        else {
+            panic!()
+        };
+
+        assert_eq!(cmd.tag, "a69");
+        assert_eq!(cmd.mailbox, "INBOX");
+    }
 }
