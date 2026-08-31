@@ -2,6 +2,7 @@ use crate::{
     client_command_from_impl,
     command::{ClientCommand, client_command::ClientCommandTrait},
     cursor::Cursor,
+    errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -11,13 +12,13 @@ pub struct SelectCommand {
 }
 
 impl ClientCommandTrait for SelectCommand {
-    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self {
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         let mailbox = cursor.atom().unwrap().to_string();
 
         cursor.eat(b'\r');
         cursor.eat(b'\n');
 
-        Self { tag, mailbox }
+        Ok(Self { tag, mailbox })
     }
 }
 

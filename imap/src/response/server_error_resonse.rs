@@ -1,14 +1,11 @@
 use util::EncodeTo;
 
+use crate::errors::CommandParseError;
+
 #[derive(Debug)]
 pub enum ServerErrorResponse {
     CommandParseError(CommandParseError),
     ProtocolViolation(String),
-}
-
-#[derive(Debug)]
-pub enum CommandParseError {
-    MalformedCommand,
 }
 
 impl EncodeTo for ServerErrorResponse {

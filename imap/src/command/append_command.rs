@@ -2,6 +2,7 @@ use crate::{
     client_command_from_impl,
     command::{ClientCommand, client_command::ClientCommandTrait},
     cursor::Cursor,
+    errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -14,7 +15,7 @@ pub struct AppendCommand {
 }
 
 impl ClientCommandTrait for AppendCommand {
-    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self {
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         let mailbox = cursor.atom().unwrap().to_string();
 
         // TODO: Any error will assume it meant empty flags
@@ -50,13 +51,13 @@ impl ClientCommandTrait for AppendCommand {
             None
         };
 
-        Self {
+        Ok(Self {
             tag,
             mailbox,
             flags,
             date_time,
             message,
-        }
+        })
     }
 }
 

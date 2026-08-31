@@ -4,7 +4,7 @@ use crate::{
         SelectCommand, StartTLSCommand, StatusCommand,
     },
     cursor::Cursor,
-    response::CommandParseError,
+    errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -23,28 +23,19 @@ pub enum ClientCommand {
 impl ClientCommand {
     pub fn parse_bytes(buf: &[u8]) -> Result<(Self, usize), CommandParseError> {
         let mut cursor = Cursor::new(buf);
-        let tag = cursor
-            .atom()
-            .map_err(|e| {
-                eprintln!("{:?}", e);
-                CommandParseError::MalformedCommand
-            })?
-            .to_string();
-        let command_text = cursor.atom().map_err(|e| {
-            eprintln!("{:?}", e);
-            CommandParseError::MalformedCommand
-        })?;
+        let tag = cursor.atom()?.to_string();
+        let command_text = cursor.atom()?;
 
         let cmd = match command_text {
-            "CAPABILITY" => CapabilityCommand::parse_bytes(tag, &mut cursor).into(),
-            "STARTTLS" => StartTLSCommand::parse_bytes(tag, &mut cursor).into(),
-            "LOGIN" => LoginCommand::parse_bytes(tag, &mut cursor).into(),
-            "LIST" => ListCommand::parse_bytes(tag, &mut cursor).into(),
-            "SELECT" => SelectCommand::parse_bytes(tag, &mut cursor).into(),
-            "STATUS" => StatusCommand::parse_bytes(tag, &mut cursor).into(),
-            "FETCH" => FetchCommand::parse_bytes(tag, &mut cursor).into(),
-            "APPEND" => AppendCommand::parse_bytes(tag, &mut cursor).into(),
-            "LOGOUT" => LogoutCommand::parse_bytes(tag, &mut cursor).into(),
+            "CAPABILITY" => CapabilityCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "STARTTLS" => StartTLSCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "LOGIN" => LoginCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "LIST" => ListCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "SELECT" => SelectCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "STATUS" => StatusCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "FETCH" => FetchCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "APPEND" => AppendCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "LOGOUT" => LogoutCommand::parse_bytes(tag, &mut cursor)?.into(),
             _ => todo!("Probably havent implemented {command_text} yet"),
         };
 
@@ -53,8 +44,8 @@ impl ClientCommand {
     }
 }
 
-pub trait ClientCommandTrait {
-    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self;
+pub trait ClientCommandTrait: Sized {
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError>;
 }
 
 #[macro_export]

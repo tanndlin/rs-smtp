@@ -1,9 +1,10 @@
-use std::{collections::HashMap, iter::Map, str::FromStr};
+use std::{collections::HashMap, str::FromStr};
 
 use crate::{
     client_command_from_impl,
     command::{ClientCommand, client_command::ClientCommandTrait},
     cursor::Cursor,
+    errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -91,38 +92,37 @@ pub enum Fetchable {
 }
 
 impl FromStr for Fetchable {
-    type Err = ();
+    type Err = CommandParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let matches: HashMap<&str, fn(&str) -> Self> = HashMap::from([
-            ("ALL", (|_: &str| Self::All) as fn(&str) -> Self),
-            ("FAST", |_| Self::Fast),
-            ("FULL", |_| Self::Full),
-            ("BINARY", parse_binary),
-            ("BODY", parse_body),
-            ("BODYSTRUCTURE", |_| Self::BodyStructure),
-            ("ENVELOPE", |_| Self::Envelope),
-            ("FLAGS", |_| Self::Flags),
-            ("INTERNALDATE", |_| Self::Internaldate),
-            ("RFC822.SIZE", |_| Self::RFC822Size),
-            ("UID", |_| Self::UID),
+        let matches: HashMap<&str, fn(&str) -> Result<Self, Self::Err>> = HashMap::from([
+            (
+                "ALL",
+                (|_: &str| Ok(Self::All)) as fn(&str) -> Result<Self, Self::Err>,
+            ),
+            ("FAST", |_| Ok(Self::Fast)),
+            ("FULL", |_| Ok(Self::Full)),
+            ("BINARY", |s| {
+                Ok(Fetchable::Binary(BinaryFetchable::from_str(s)?))
+            }),
+            ("BODY", |s| Ok(Fetchable::Body(BodyFetchable::from_str(s)?))),
+            ("BODYSTRUCTURE", |_| Ok(Self::BodyStructure)),
+            ("ENVELOPE", |_| Ok(Self::Envelope)),
+            ("FLAGS", |_| Ok(Self::Flags)),
+            ("INTERNALDATE", |_| Ok(Self::Internaldate)),
+            ("RFC822.SIZE", |_| Ok(Self::RFC822Size)),
+            ("UID", |_| Ok(Self::UID)),
         ]);
 
         matches
             .keys()
             .filter(|key| s.starts_with(**key))
             .max_by_key(|key| key.len())
-            .map(|key| matches[key](s))
-            .ok_or(())
+            .ok_or(CommandParseError::MalformedCommand(Some(format!(
+                "Fetchable: unknown attribute {s:?}"
+            ))))
+            .map(|key| matches[key](s))?
     }
-}
-
-fn parse_binary(s: &str) -> Fetchable {
-    Fetchable::Binary(BinaryFetchable::from_str(s).unwrap())
-}
-
-fn parse_body(s: &str) -> Fetchable {
-    Fetchable::Body(BodyFetchable::from_str(s).unwrap())
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -138,10 +138,10 @@ pub enum BinaryFetchable {
 }
 
 impl FromStr for BinaryFetchable {
-    type Err = ();
+    type Err = CommandParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let rest = s.strip_prefix("BINARY").ok_or(())?;
+        let rest = s.strip_prefix("BINARY").unwrap();
 
         if let Some(rest) = rest.strip_prefix(".SIZE") {
             return Ok(BinaryFetchable::Size {
@@ -154,8 +154,16 @@ impl FromStr for BinaryFetchable {
             None => (false, rest),
         };
 
-        let rest = rest.strip_prefix('[').ok_or(())?;
-        let close = rest.find(']').ok_or(())?;
+        let rest = rest
+            .strip_prefix('[')
+            .ok_or(CommandParseError::MalformedCommand(Some(format!(
+                "BinaryFetchable: Expected \"[\". Got: {rest}"
+            ))))?;
+        let close = rest
+            .find(']')
+            .ok_or(CommandParseError::MalformedCommand(Some(format!(
+                "BinaryFetchable: Expected \"]\". Got: {rest}"
+            ))))?;
 
         let inner = rest[..close].trim();
         let part = if inner.is_empty() {
@@ -164,7 +172,9 @@ impl FromStr for BinaryFetchable {
             let (nums, leftover) = split_part_numbers(inner);
             // BINARY only addresses numbered parts - no HEADER/TEXT/MIME.
             if !leftover.is_empty() {
-                return Err(());
+                return Err(CommandParseError::MalformedCommand(Some(format!(
+                    "BinaryFetchable: left over parts: {leftover}"
+                ))));
             }
             nums
         };
@@ -185,11 +195,13 @@ impl FromStr for BinaryFetchable {
 }
 
 /// Parse a `[section-part]` (numbered parts only, e.g. `[1.2]` or `[]`).
-fn parse_section_binary(s: &str) -> Result<Vec<u32>, ()> {
+fn parse_section_binary(s: &str) -> Result<Vec<u32>, CommandParseError> {
     let inner = s
         .strip_prefix('[')
         .and_then(|s| s.strip_suffix(']'))
-        .ok_or(())?
+        .ok_or(CommandParseError::MalformedCommand(Some(format!(
+            "Binary section parser: Missing brackets. Got: {s}"
+        ))))?
         .trim();
 
     if inner.is_empty() {
@@ -200,7 +212,9 @@ fn parse_section_binary(s: &str) -> Result<Vec<u32>, ()> {
     if leftover.is_empty() {
         Ok(nums)
     } else {
-        Err(())
+        Err(CommandParseError::MalformedCommand(Some(format!(
+            "Binary section parser: left over parts: {leftover}"
+        ))))
     }
 }
 
@@ -218,10 +232,10 @@ pub enum BodyFetchable {
 }
 
 impl FromStr for BodyFetchable {
-    type Err = ();
+    type Err = CommandParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let rest = s.strip_prefix("BODY").ok_or(())?;
+        let rest = s.strip_prefix("BODY").unwrap();
 
         if rest.is_empty() {
             return Ok(BodyFetchable::Full);
@@ -232,8 +246,16 @@ impl FromStr for BodyFetchable {
             None => (false, rest),
         };
 
-        let rest = rest.strip_prefix('[').ok_or(())?;
-        let close = rest.find(']').ok_or(())?;
+        let rest = rest
+            .strip_prefix('[')
+            .ok_or(CommandParseError::MalformedCommand(Some(format!(
+                "BodyFetchable: Expected \"[\". Got: {rest}"
+            ))))?;
+        let close = rest
+            .find(']')
+            .ok_or(CommandParseError::MalformedCommand(Some(format!(
+                "BodyFetchable: Expected \"]\". Got: {rest}"
+            ))))?;
         let section = parse_section(rest[..close].trim())?;
 
         let after = &rest[close + 1..];
@@ -278,7 +300,7 @@ pub enum SectionText {
     Mime,
 }
 
-fn parse_section(inner: &str) -> Result<Section, ()> {
+fn parse_section(inner: &str) -> Result<Section, CommandParseError> {
     if inner.is_empty() {
         return Ok(Section::Full);
     }
@@ -296,7 +318,7 @@ fn parse_section(inner: &str) -> Result<Section, ()> {
     Ok(Section::Msg(parse_section_text(inner)?))
 }
 
-fn parse_section_text(s: &str) -> Result<SectionText, ()> {
+fn parse_section_text(s: &str) -> Result<SectionText, CommandParseError> {
     let upper = s.trim().to_ascii_uppercase();
 
     match upper.as_str() {
@@ -313,20 +335,26 @@ fn parse_section_text(s: &str) -> Result<SectionText, ()> {
         return Ok(SectionText::HeaderFields(parse_header_list(list)?));
     }
 
-    Err(())
+    Err(CommandParseError::MalformedCommand(Some(format!(
+        "SectionText: unknown text spec {s:?}"
+    ))))
 }
 
 /// Parse a parenthesised, space-separated `(Field-1 Field-2 ...)` list.
-fn parse_header_list(s: &str) -> Result<Vec<String>, ()> {
+fn parse_header_list(s: &str) -> Result<Vec<String>, CommandParseError> {
     let inner = s
         .trim()
         .strip_prefix('(')
         .and_then(|s| s.strip_suffix(')'))
-        .ok_or(())?;
+        .ok_or(CommandParseError::MalformedCommand(Some(format!(
+            "Header field list: Expected \"(...)\". Got: {s}"
+        ))))?;
 
     let fields: Vec<String> = inner.split_whitespace().map(str::to_string).collect();
     if fields.is_empty() {
-        return Err(());
+        return Err(CommandParseError::MalformedCommand(Some(format!(
+            "Header field list: empty list. Got: {s}"
+        ))));
     }
     Ok(fields)
 }
@@ -361,43 +389,49 @@ pub struct Partial {
 }
 
 impl FromStr for Partial {
-    type Err = ();
+    type Err = CommandParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let inner = s
             .strip_prefix('<')
             .and_then(|s| s.strip_suffix('>'))
-            .ok_or(())?;
+            .ok_or(CommandParseError::MalformedCommand(Some(format!(
+                "Partial: Expected \"<...>\". Got: {s}"
+            ))))?;
 
-        let (start, count) = inner.split_once('.').ok_or(())?;
+        let (start, count) = inner
+            .split_once('.')
+            .ok_or(CommandParseError::MalformedCommand(Some(format!(
+                "Partial: No . delimiter found. Got: {inner}"
+            ))))?;
         Ok(Partial {
-            start: start.parse().map_err(|_| ())?,
-            count: count.parse().map_err(|_| ())?,
+            start: start.parse()?,
+            count: count.parse()?,
         })
     }
 }
 
 impl ClientCommandTrait for FetchCommand {
-    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self {
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         let sequence = Sequence::from_str(cursor.atom().unwrap()).unwrap();
-        let fetch_list = match cursor
-            .paren_list(|c| c.atom())
-            .map(|v| v.iter().map(|f| Fetchable::from_str(f).unwrap()).collect())
-        {
-            Ok(fetch_list) => fetch_list,
-            Err(_) => vec![
-                cursor
-                    .atom()
-                    .map(|f| Fetchable::from_str(f).unwrap())
-                    .unwrap(),
-            ],
+
+        // A FETCH takes either a parenthesized list of items, or a single
+        // bare item with no parens (e.g. `FETCH 1 BODY`).
+        let items = match cursor.paren_list(|c| c.fetch_att()) {
+            Ok(items) => items,
+            Err(_) => vec![cursor.fetch_att()?],
         };
 
-        Self {
+        let fetch_list = items
+            .into_iter()
+            .map(Fetchable::from_str)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Self {
             tag,
             sequence,
             fetch_list,
-        }
+        })
     }
 }
 
@@ -444,17 +478,51 @@ mod tests {
     }
 
     #[test]
+    fn parses_double_index_range() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1:9 BODY\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        let Sequence::Range { start, end } = cmd.sequence else {
+            panic!()
+        };
+
+        assert!(matches!(start, FetchIndicator::Index(1)));
+        assert!(matches!(end, FetchIndicator::Index(9)));
+
+        assert!(cmd.fetch_list.len() == 1);
+        assert!(matches!(
+            cmd.fetch_list[0],
+            Fetchable::Body(BodyFetchable::Full)
+        ));
+    }
+
+    #[test]
     fn body_bare_is_full() {
-        assert_eq!(
-            BodyFetchable::from_str("BODY").unwrap(),
-            BodyFetchable::Full
-        );
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 BODY\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        let Fetchable::Body(body) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Body, got {:?}", cmd.fetch_list[0]);
+        };
+        assert_eq!(*body, BodyFetchable::Full);
     }
 
     #[test]
     fn body_whole_message_with_partial() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 BODY[]<0.2048>\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        let Fetchable::Body(body) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Body, got {:?}", cmd.fetch_list[0]);
+        };
         assert_eq!(
-            BodyFetchable::from_str("BODY[]<0.2048>").unwrap(),
+            *body,
             BodyFetchable::Section {
                 peek: false,
                 section: Section::Full,
@@ -468,8 +536,19 @@ mod tests {
 
     #[test]
     fn body_peek_header_fields() {
+        let (cmd, _) = ClientCommand::parse_bytes(
+            b"a1 FETCH 1 BODY.PEEK[HEADER.FIELDS (DATE FROM SUBJECT)]\r\n",
+        )
+        .unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        let Fetchable::Body(body) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Body, got {:?}", cmd.fetch_list[0]);
+        };
         assert_eq!(
-            BodyFetchable::from_str("BODY.PEEK[HEADER.FIELDS (DATE FROM SUBJECT)]").unwrap(),
+            *body,
             BodyFetchable::Section {
                 peek: true,
                 section: Section::Msg(SectionText::HeaderFields(vec![
@@ -484,8 +563,16 @@ mod tests {
 
     #[test]
     fn body_nested_part_mime() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 BODY[4.1.MIME]\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        let Fetchable::Body(body) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Body, got {:?}", cmd.fetch_list[0]);
+        };
         assert_eq!(
-            BodyFetchable::from_str("BODY[4.1.MIME]").unwrap(),
+            *body,
             BodyFetchable::Section {
                 peek: false,
                 section: Section::Part {
@@ -499,8 +586,16 @@ mod tests {
 
     #[test]
     fn body_part_no_text() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 BODY[2]\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        let Fetchable::Body(body) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Body, got {:?}", cmd.fetch_list[0]);
+        };
         assert_eq!(
-            BodyFetchable::from_str("BODY[2]").unwrap(),
+            *body,
             BodyFetchable::Section {
                 peek: false,
                 section: Section::Part {
@@ -514,13 +609,22 @@ mod tests {
 
     #[test]
     fn body_peek_without_section_is_err() {
-        assert!(BodyFetchable::from_str("BODY.PEEK").is_err());
+        assert!(ClientCommand::parse_bytes(b"a1 FETCH 1 BODY.PEEK\r\n").is_err());
     }
 
     #[test]
     fn binary_peek_with_partial() {
+        let (cmd, _) =
+            ClientCommand::parse_bytes(b"a1 FETCH 1 BINARY.PEEK[1.2]<0.512>\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        let Fetchable::Binary(binary) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Binary, got {:?}", cmd.fetch_list[0]);
+        };
         assert_eq!(
-            BinaryFetchable::from_str("BINARY.PEEK[1.2]<0.512>").unwrap(),
+            *binary,
             BinaryFetchable::Content {
                 peek: true,
                 part: vec![1, 2],
@@ -534,14 +638,19 @@ mod tests {
 
     #[test]
     fn binary_size() {
-        assert_eq!(
-            BinaryFetchable::from_str("BINARY.SIZE[3]").unwrap(),
-            BinaryFetchable::Size { part: vec![3] }
-        );
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 BINARY.SIZE[3]\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        let Fetchable::Binary(binary) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Binary, got {:?}", cmd.fetch_list[0]);
+        };
+        assert_eq!(*binary, BinaryFetchable::Size { part: vec![3] });
     }
 
     #[test]
     fn binary_rejects_text_section() {
-        assert!(BinaryFetchable::from_str("BINARY[HEADER]").is_err());
+        assert!(ClientCommand::parse_bytes(b"a1 FETCH 1 BINARY[HEADER]\r\n").is_err());
     }
 }

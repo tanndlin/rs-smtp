@@ -2,6 +2,7 @@ use crate::{
     client_command_from_impl,
     command::{ClientCommand, client_command::ClientCommandTrait},
     cursor::Cursor,
+    errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -12,11 +13,11 @@ pub struct LoginCommand {
 }
 
 impl ClientCommandTrait for LoginCommand {
-    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self {
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         let user = cursor.atom().unwrap().to_string();
         let pass = cursor.atom().unwrap().to_string();
 
-        Self { tag, user, pass }
+        Ok(Self { tag, user, pass })
     }
 }
 

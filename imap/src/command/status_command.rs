@@ -2,6 +2,7 @@ use crate::{
     client_command_from_impl,
     command::client_command::{ClientCommand, ClientCommandTrait},
     cursor::Cursor,
+    errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -19,7 +20,7 @@ pub struct StatusCommand {
 }
 
 impl ClientCommandTrait for StatusCommand {
-    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Self {
+    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         let mailbox = cursor.atom().unwrap().to_string();
 
         let flags = cursor.paren_list(|c| c.atom()).unwrap();
@@ -32,7 +33,7 @@ impl ClientCommandTrait for StatusCommand {
 
         cursor.eat(b'\r');
         cursor.eat(b'\n');
-        Self {
+        Ok(Self {
             tag,
             mailbox,
             messages,
@@ -41,7 +42,7 @@ impl ClientCommandTrait for StatusCommand {
             unseen,
             deleted,
             size,
-        }
+        })
     }
 }
 
