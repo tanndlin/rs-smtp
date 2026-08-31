@@ -10,7 +10,9 @@ async fn responds_to_login() {
     let mut stream = TcpStream::connect(addr).unwrap();
     let _ = read_available(&mut stream); // consume greeting
 
-    stream.write_all(b"a1 LOGIN admin password\r\n").unwrap();
+    stream
+        .write_all(b"a1 LOGIN \"admin\" \"password\"\r\n")
+        .unwrap();
     let resp = read_available(&mut stream);
 
     assert!(

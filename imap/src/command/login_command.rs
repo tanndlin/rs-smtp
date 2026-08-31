@@ -14,11 +14,50 @@ pub struct LoginCommand {
 
 impl ClientCommandTrait for LoginCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        let user = cursor.atom()?.to_string();
-        let pass = cursor.atom()?.to_string();
+        let user = cursor.string()?.to_string();
+        let pass = cursor.string()?.to_string();
+
+        cursor.eat(b'\r')?;
+        cursor.eat(b'\n')?;
 
         Ok(Self { tag, user, pass })
     }
 }
 
 client_command_from_impl!(LoginCommand, Login);
+
+#[cfg(test)]
+mod tests {
+    use crate::errors::{ParseError, ParseErrorKind};
+
+    use super::*;
+
+    #[test]
+    fn parses_login_command() {
+        let (ClientCommand::Login(cmd), _) =
+            ClientCommand::parse_bytes(b"a69 LOGIN \"test\" \"pass\"").unwrap()
+        else {
+            panic!()
+        };
+
+        assert_eq!(cmd.tag, "a69");
+        assert_eq!(cmd.user, "test");
+        assert_eq!(cmd.pass, "pass");
+    }
+
+    #[test]
+    fn parses_no_user_quotes_throws() {
+        let Err(e) = ClientCommand::parse_bytes(b"a69 LOGIN test \"pass\"") else {
+            panic!()
+        };
+
+        assert!(matches!(
+            e,
+            CommandParseError::ParseError(ParseError {
+                kind: ParseErrorKind::UnexpectedChar,
+                pos: 10,
+                ..
+            })
+        ))
+    }
+}

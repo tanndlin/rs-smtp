@@ -64,8 +64,8 @@ impl<'a> Cursor<'a> {
             self.pos += 1
         }
 
-        self.eat(b'"')?;
         let end = self.pos;
+        self.eat(b'"')?;
 
         Ok(Cow::Borrowed(
             str::from_utf8(&self.buf[start..end]).unwrap(),
