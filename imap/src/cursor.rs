@@ -23,8 +23,8 @@ impl<'a> Cursor<'a> {
             self.skip_sp();
         }
 
-        if self.peek().ok_or(ParseError::OutOfBytes)? != b {
-            return Err(ParseError::UnexpectedChar(self.pos));
+        if self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? != b {
+            return Err(ParseError::unexpected_char(self.pos));
         }
         self.pos += 1;
         Ok(())
@@ -46,7 +46,7 @@ impl<'a> Cursor<'a> {
             self.pos += 1;
         }
         if self.pos == start {
-            return Err(ParseError::ExpectedAtom(self.pos));
+            return Err(ParseError::expected_atom(self.pos));
         }
         Ok(str::from_utf8(&self.buf[start..self.pos]).unwrap()) // bytes are all ASCII
     }
@@ -60,7 +60,7 @@ impl<'a> Cursor<'a> {
 
         self.eat(b'"')?;
         let start = self.pos;
-        while self.peek().ok_or(ParseError::OutOfBytes)? != b'"' {
+        while self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? != b'"' {
             self.pos += 1
         }
 
@@ -79,8 +79,12 @@ impl<'a> Cursor<'a> {
             self.skip_sp();
         }
 
-        if !(self.peek().ok_or(ParseError::OutOfBytes)?.is_ascii_digit()) {
-            return Err(ParseError::ExpectedNumber(self.pos));
+        if !(self
+            .peek()
+            .ok_or_else(|| ParseError::out_of_bytes(self.pos))?
+            .is_ascii_digit())
+        {
+            return Err(ParseError::expected_number(self.pos));
         }
 
         let mut n = 0u64;
@@ -106,7 +110,7 @@ impl<'a> Cursor<'a> {
         }
 
         // Support a single non parenthesized item
-        if let next = self.peek().ok_or(ParseError::OutOfBytes)?
+        if let next = self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))?
             && is_atom_char(next)
         {
             return Ok(vec![f(self)?]);
@@ -117,8 +121,8 @@ impl<'a> Cursor<'a> {
         let mut items = vec![];
         items.push(f(self)?);
 
-        while self.peek().ok_or(ParseError::OutOfBytes)? != b')' {
-            while self.peek().ok_or(ParseError::OutOfBytes)? != b' ' {
+        while self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? != b')' {
+            while self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? != b' ' {
                 self.pos += 1;
             }
 
@@ -153,7 +157,7 @@ impl<'a> Cursor<'a> {
             self.pos += 1;
             let mut paren_depth = 0u32;
             loop {
-                match self.peek().ok_or(ParseError::OutOfBytes)? {
+                match self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? {
                     b']' if paren_depth == 0 => {
                         self.pos += 1;
                         break;
@@ -165,7 +169,7 @@ impl<'a> Cursor<'a> {
                     b')' => {
                         paren_depth = paren_depth
                             .checked_sub(1)
-                            .ok_or(ParseError::UnexpectedChar(self.pos))?;
+                            .ok_or_else(|| ParseError::unexpected_char(self.pos))?;
                         self.pos += 1;
                     }
                     _ => self.pos += 1,
@@ -176,7 +180,7 @@ impl<'a> Cursor<'a> {
         if self.peek() == Some(b'<') {
             self.pos += 1;
             loop {
-                match self.peek().ok_or(ParseError::OutOfBytes)? {
+                match self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? {
                     b'>' => {
                         self.pos += 1;
                         break;
@@ -187,7 +191,7 @@ impl<'a> Cursor<'a> {
         }
 
         if self.pos == start {
-            return Err(ParseError::ExpectedAtom(self.pos));
+            return Err(ParseError::expected_atom(self.pos));
         }
 
         Ok(str::from_utf8(&self.buf[start..self.pos]).unwrap()) // bytes are all ASCII

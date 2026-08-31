@@ -14,8 +14,8 @@ pub struct LoginCommand {
 
 impl ClientCommandTrait for LoginCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        let user = cursor.atom().unwrap().to_string();
-        let pass = cursor.atom().unwrap().to_string();
+        let user = cursor.atom()?.to_string();
+        let pass = cursor.atom()?.to_string();
 
         Ok(Self { tag, user, pass })
     }

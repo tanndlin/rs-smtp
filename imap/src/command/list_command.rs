@@ -13,8 +13,8 @@ pub struct ListCommand {
 impl ClientCommandTrait for ListCommand {
     // TODO: Actually parse LIST
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        cursor.eat(b'\r');
-        cursor.eat(b'\n');
+        cursor.eat(b'\r')?;
+        cursor.eat(b'\n')?;
         Ok(Self { tag })
     }
 }

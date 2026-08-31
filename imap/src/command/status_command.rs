@@ -52,7 +52,7 @@ client_command_from_impl!(StatusCommand, Status);
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::ParseError;
+    use crate::errors::{ParseError, ParseErrorKind};
 
     use super::*;
 
@@ -63,7 +63,11 @@ mod tests {
         };
         assert!(matches!(
             e,
-            CommandParseError::ParseError(ParseError::UnexpectedChar(23))
+            CommandParseError::ParseError(ParseError {
+                kind: ParseErrorKind::UnexpectedChar,
+                pos: 23,
+                ..
+            })
         ));
     }
 
