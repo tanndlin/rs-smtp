@@ -23,7 +23,7 @@ fn connect_and_login(addr: std::net::SocketAddr) -> TcpStream {
 #[tokio::test(flavor = "multi_thread")]
 async fn append_with_nonsync_literal_returns_ok() {
     let addr = start_server().await;
-    let mut stream = connect_and_login(addr);
+    let mut stream = connect_and_login(*addr);
 
     // LITERAL+ (RFC 7888): body follows immediately, no continuation needed.
     stream
@@ -44,7 +44,7 @@ async fn append_with_nonsync_literal_returns_ok() {
 #[tokio::test(flavor = "multi_thread")]
 async fn append_with_synchronizing_literal_gets_continuation() {
     let addr = start_server().await;
-    let mut stream = connect_and_login(addr);
+    let mut stream = connect_and_login(*addr);
 
     // No `+`: the server must reply with a `+` continuation before the client
     // sends the message octets.
@@ -66,7 +66,7 @@ async fn append_with_synchronizing_literal_gets_continuation() {
 #[tokio::test(flavor = "multi_thread")]
 async fn append_accepts_flags_and_date_time() {
     let addr = start_server().await;
-    let mut stream = connect_and_login(addr);
+    let mut stream = connect_and_login(*addr);
 
     stream
         .write_all(
@@ -84,7 +84,7 @@ async fn append_accepts_flags_and_date_time() {
 #[tokio::test(flavor = "multi_thread")]
 async fn append_before_login_is_rejected() {
     let addr = start_server().await;
-    let mut stream = TcpStream::connect(addr).unwrap();
+    let mut stream = TcpStream::connect(*addr).unwrap();
     let _ = read_available(&mut stream); // greeting
 
     stream
@@ -101,7 +101,7 @@ async fn append_before_login_is_rejected() {
 #[tokio::test(flavor = "multi_thread")]
 async fn append_to_unknown_mailbox_reports_trycreate() {
     let addr = start_server().await;
-    let mut stream = connect_and_login(addr);
+    let mut stream = connect_and_login(*addr);
 
     stream
         .write_all(b"a2 APPEND \"No Such Box\" {13+}\r\nHello, World!\r\n")

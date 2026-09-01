@@ -8,7 +8,7 @@ use test_util::{read_available, start_server};
 #[tokio::test(flavor = "multi_thread")]
 async fn logout_closes_connection() {
     let addr = start_server().await;
-    let mut stream = TcpStream::connect(addr).unwrap();
+    let mut stream = TcpStream::connect(*addr).unwrap();
     let _ = read_available(&mut stream); // consume greeting
 
     stream.write_all(b"a1 LOGOUT\r\n").unwrap();
