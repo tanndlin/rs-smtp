@@ -1,6 +1,7 @@
 use std::fmt;
 use std::num::ParseIntError;
 use std::panic::Location;
+use std::str::Utf8Error;
 
 /// A parse failure, carrying enough context to actually debug it:
 /// - `kind`: what went wrong
@@ -20,6 +21,7 @@ pub enum ParseErrorKind {
     UnexpectedChar,
     ExpectedNumber,
     ParseIntError(ParseIntError),
+    Utf8Error(Utf8Error),
 }
 
 impl ParseError {
@@ -89,5 +91,12 @@ impl From<ParseIntError> for ParseError {
     #[track_caller]
     fn from(e: ParseIntError) -> Self {
         Self::new(ParseErrorKind::ParseIntError(e), 0)
+    }
+}
+
+impl From<Utf8Error> for ParseError {
+    #[track_caller]
+    fn from(e: Utf8Error) -> Self {
+        Self::new(ParseErrorKind::Utf8Error(e), 0)
     }
 }

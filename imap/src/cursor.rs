@@ -23,7 +23,11 @@ impl<'a> Cursor<'a> {
             self.skip_sp();
         }
 
-        if self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? != b {
+        if self
+            .peek()
+            .ok_or_else(|| ParseError::out_of_bytes(self.pos))?
+            != b
+        {
             return Err(ParseError::unexpected_char(self.pos));
         }
         self.pos += 1;
@@ -58,18 +62,50 @@ impl<'a> Cursor<'a> {
             self.skip_sp();
         }
 
-        self.eat(b'"')?;
-        let start = self.pos;
-        while self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? != b'"' {
-            self.pos += 1
+        // --------------------- 3 cases ---------------------
+        // A: Is a quoted string
+        if self.eat(b'"').is_ok() {
+            let start = self.pos;
+            while self
+                .peek()
+                .ok_or_else(|| ParseError::out_of_bytes(self.pos))?
+                != b'"'
+            {
+                self.pos += 1
+            }
+
+            let end = self.pos;
+            self.eat(b'"')?;
+
+            return Ok(Cow::Borrowed(
+                str::from_utf8(&self.buf[start..end]).unwrap(),
+            ));
         }
 
-        let end = self.pos;
-        self.eat(b'"')?;
+        // B: Is length delimted
+        if self.eat(b'{').is_ok() {
+            let size = self.number()?;
+            if let next = self.peek().ok_or(ParseError::out_of_bytes(self.pos))?
+                && next == b'+'
+            {
+                self.pos += 1;
+            }
 
-        Ok(Cow::Borrowed(
-            str::from_utf8(&self.buf[start..end]).unwrap(),
-        ))
+            self.eat(b'}')?;
+            self.eat(b'\r')?;
+            self.eat(b'\n')?;
+
+            let start = self.pos;
+            self.pos += size as usize;
+            return if self.buf.get(self.pos - 1).is_some() {
+                Ok(Cow::Borrowed(str::from_utf8(&self.buf[start..self.pos])?))
+            } else {
+                Err(ParseError::out_of_bytes(start))
+            };
+        }
+
+        // C: Try as atom
+        self.atom().map(Cow::Borrowed)
     }
 
     pub fn number(&mut self) -> Result<u64, ParseError> {
@@ -110,7 +146,9 @@ impl<'a> Cursor<'a> {
         }
 
         // Support a single non parenthesized item
-        if let next = self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))?
+        if let next = self
+            .peek()
+            .ok_or_else(|| ParseError::out_of_bytes(self.pos))?
             && is_atom_char(next)
         {
             return Ok(vec![f(self)?]);
@@ -121,8 +159,16 @@ impl<'a> Cursor<'a> {
         let mut items = vec![];
         items.push(f(self)?);
 
-        while self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? != b')' {
-            while self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? != b' ' {
+        while self
+            .peek()
+            .ok_or_else(|| ParseError::out_of_bytes(self.pos))?
+            != b')'
+        {
+            while self
+                .peek()
+                .ok_or_else(|| ParseError::out_of_bytes(self.pos))?
+                != b' '
+            {
                 self.pos += 1;
             }
 
@@ -157,7 +203,10 @@ impl<'a> Cursor<'a> {
             self.pos += 1;
             let mut paren_depth = 0u32;
             loop {
-                match self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? {
+                match self
+                    .peek()
+                    .ok_or_else(|| ParseError::out_of_bytes(self.pos))?
+                {
                     b']' if paren_depth == 0 => {
                         self.pos += 1;
                         break;
@@ -180,7 +229,10 @@ impl<'a> Cursor<'a> {
         if self.peek() == Some(b'<') {
             self.pos += 1;
             loop {
-                match self.peek().ok_or_else(|| ParseError::out_of_bytes(self.pos))? {
+                match self
+                    .peek()
+                    .ok_or_else(|| ParseError::out_of_bytes(self.pos))?
+                {
                     b'>' => {
                         self.pos += 1;
                         break;

@@ -28,14 +28,12 @@ client_command_from_impl!(LoginCommand, Login);
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::{ParseError, ParseErrorKind};
-
     use super::*;
 
     #[test]
     fn parses_login_command() {
         let (ClientCommand::Login(cmd), _) =
-            ClientCommand::parse_bytes(b"a69 LOGIN \"test\" \"pass\"").unwrap()
+            ClientCommand::parse_bytes(b"a69 LOGIN \"test\" \"pass\"\r\n").unwrap()
         else {
             panic!()
         };
@@ -46,18 +44,15 @@ mod tests {
     }
 
     #[test]
-    fn parses_no_user_quotes_throws() {
-        let Err(e) = ClientCommand::parse_bytes(b"a69 LOGIN test \"pass\"") else {
+    fn parses_unquoted_user() {
+        let (ClientCommand::Login(cmd), _) =
+            ClientCommand::parse_bytes(b"a69 LOGIN test \"pass\"\r\n").unwrap()
+        else {
             panic!()
         };
 
-        assert!(matches!(
-            e,
-            CommandParseError::ParseError(ParseError {
-                kind: ParseErrorKind::UnexpectedChar,
-                pos: 10,
-                ..
-            })
-        ))
+        assert_eq!(cmd.tag, "a69");
+        assert_eq!(cmd.user, "test");
+        assert_eq!(cmd.pass, "pass");
     }
 }
