@@ -12,6 +12,7 @@ pub struct ServerErrorResponse {
 pub enum ServerErrorReason {
     CommandParseError(CommandParseError),
     ProtocolViolation(String),
+    Deny(String),
 }
 
 impl ServerErrorResponse {
@@ -28,6 +29,7 @@ impl EncodeTo for ServerErrorResponse {
             ServerErrorReason::ProtocolViolation(reason) => {
                 buf.extend(format!("{tag} BAD {reason}\r\n").bytes())
             }
+            ServerErrorReason::Deny(reason) => buf.extend(format!("{tag} NO {reason}\r\n").bytes()),
         }
     }
 }

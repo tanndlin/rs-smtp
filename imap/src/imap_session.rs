@@ -4,12 +4,14 @@ use sqlx::{Pool, Postgres};
 
 use crate::{
     command::{
-        ClientCommand, ClientCommandTrait, FetchCommand, ListCommand, LogoutCommand, SelectCommand,
-        StatusCommand,
+        AppendCommand, ClientCommand, ClientCommandTrait, FetchCommand, ListCommand, LogoutCommand,
+        SelectCommand, StatusCommand,
     },
     response::{
-        CapabilityResponse, Greeting, ListResponse, LoginResponse, LoginResult, LogoutResponse,
-        MailboxListEntry, SelectResponse, ServerResponse, ServerResponseTrait, StatusResponse,
+        AppendOkResponse, CapabilityResponse, ContinuationResponse, Greeting, ListResponse,
+        LoginResponse, LoginResult, LogoutResponse, MailboxListEntry, SelectResponse,
+        ServerErrorReason, ServerErrorResponse, ServerResponse, ServerResponseTrait,
+        StatusResponse,
     },
 };
 
@@ -17,7 +19,7 @@ pub struct IMAPSession {
     db_pool: Arc<Pool<Postgres>>,
     auth_state: SessionState,
     selected_mailbox: Option<String>,
-    expecting_append_mail: bool,
+    expecting_append_mail: Option<AppendCommand>, // TODO: This doesnt support pipelining, but i haven't looked into how that actually works anyways
 }
 
 #[derive(Default)]
@@ -35,7 +37,7 @@ impl IMAPSession {
             db_pool,
             auth_state: SessionState::default(),
             selected_mailbox: None,
-            expecting_append_mail: false,
+            expecting_append_mail: None,
         }
     }
 
@@ -86,7 +88,7 @@ impl IMAPSession {
                 ClientCommand::Select(cmd) => self.handle_select_command(cmd).await,
                 ClientCommand::Status(cmd) => self.handle_status_command(cmd).await,
                 ClientCommand::Fetch(cmd) => self.handle_fetch_command(cmd).await,
-                ClientCommand::Append(_) => todo!("APPEND command is not implemented"),
+                ClientCommand::Append(cmd) => self.handle_append_command(cmd).await,
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
                 ClientCommand::Capability(_)
                 | ClientCommand::StartTLS(_)
@@ -200,5 +202,32 @@ impl IMAPSession {
 
     async fn handle_fetch_command(&self, cmd: FetchCommand) -> ServerResponse {
         todo!()
+    }
+
+    async fn handle_append_command(&self, cmd: AppendCommand) -> ServerResponse {
+        // Check if the mailbox exists
+        let mailbox = sqlx::query!("SELECT name FROM mailboxes WHERE name = $1", cmd.mailbox)
+            .fetch_optional(&*self.db_pool)
+            .await
+            .expect("Failed to look up mailbox");
+        if mailbox.is_none() {
+            return ServerResponse::Error(ServerErrorResponse {
+                tag: Some(cmd.tag.to_string()),
+                reason: ServerErrorReason::Deny("TRYCREATE".to_string()),
+            });
+        }
+
+        match cmd.message.take() {
+            Some(message) => {
+                let (uidvalidity, uid) = self.store_appended_message(&cmd, &message).await;
+                AppendOkResponse::new(cmd.tag, uidvalidity, uid).into()
+            }
+            None => {
+                // synchronizing literal: tell the client to send the bytes,
+                // and remember we're mid-APPEND so the next read isn't parsed as a command
+                self.expecting_append_mail = Some(cmd);
+                ContinuationResponse { tag: cmd.tag }.into() // encodes `+ ...\r\n`
+            }
+        }
     }
 }

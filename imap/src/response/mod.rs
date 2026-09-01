@@ -1,4 +1,6 @@
+mod append_ok_response;
 mod capability_response;
+mod continuation_response;
 mod greeting;
 mod list_response;
 mod login_response;
@@ -8,7 +10,9 @@ mod server_error_resonse;
 mod server_response;
 mod status_response;
 
+pub use append_ok_response::AppendOkResponse;
 pub use capability_response::CapabilityResponse;
+pub use continuation_response::ContinuationResponse;
 pub use greeting::Greeting;
 pub use list_response::{ListResponse, MailboxListEntry};
 pub use login_response::{LoginResponse, LoginResult};
