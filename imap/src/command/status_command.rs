@@ -21,7 +21,7 @@ pub struct StatusCommand {
 
 impl ClientCommandTrait for StatusCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        let mailbox = cursor.atom()?.to_string();
+        let mailbox = cursor.string()?.to_string();
 
         let flags = cursor.paren_list(|c| c.atom())?;
         dbg!(&flags);
