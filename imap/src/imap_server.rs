@@ -74,13 +74,8 @@ async fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Po
                     }
                 }
                 Err(e) => {
-                    eprintln!(
-                        "Failed to parse command from {addr}:\n{}",
-                        e.render(&bytes)
-                    );
-                    let _ = stream
-                        .write_all(b"* BAD could not parse command\r\n")
-                        .await;
+                    eprintln!("Failed to parse command from {addr}:\n{}", e.render(&bytes));
+                    let _ = stream.write_all(b"* BAD could not parse command\r\n").await;
                     // Drop what we have so we don't spin on the same bytes.
                     bytes.clear();
                     break;

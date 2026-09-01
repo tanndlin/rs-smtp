@@ -1,4 +1,4 @@
-use sqlx::types::chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc};
 
 pub struct Email {
     pub sender: String,
@@ -19,11 +19,30 @@ fn header<'a>(raw: &'a str, name: &str) -> Option<&'a str> {
         .map(|l| l[prefix.len()..].trim())
 }
 
+fn address_list(raw: &str, name: &str) -> Vec<String> {
+    header(raw, name)
+        .map(|v| v.split(',').map(|s| s.trim().to_string()).collect())
+        .unwrap_or_default()
+}
+
 impl Email {
+    /// Build a message when the envelope sender and recipients are known
+    /// out-of-band (the SMTP ingest path supplies them from `MAIL FROM` /
+    /// `RCPT TO`).
     pub fn new(sender: String, recipients_to: Vec<String>, raw: String) -> Self {
-        let recipients_cc = header(&raw, "Cc")
-            .map(|cc| cc.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_default();
+        Self::build(sender, recipients_to, raw)
+    }
+
+    /// Build a message that arrived with no envelope (IMAP `APPEND`): the
+    /// sender and recipients are taken from the `From:` and `To:` headers.
+    pub fn from_raw(raw: String) -> Self {
+        let sender = header(&raw, "From").unwrap_or_default().to_string();
+        let recipients_to = address_list(&raw, "To");
+        Self::build(sender, recipients_to, raw)
+    }
+
+    fn build(sender: String, recipients_to: Vec<String>, raw: String) -> Self {
+        let recipients_cc = address_list(&raw, "Cc");
 
         let subject = header(&raw, "Subject").map(|s| s.to_string());
 

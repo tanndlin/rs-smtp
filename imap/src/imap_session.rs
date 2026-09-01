@@ -14,6 +14,7 @@ use crate::{
         StatusResponse,
     },
 };
+use util::Email;
 
 pub struct IMAPSession {
     db_pool: Arc<Pool<Postgres>>,
@@ -204,7 +205,7 @@ impl IMAPSession {
         todo!()
     }
 
-    async fn handle_append_command(&self, cmd: AppendCommand) -> ServerResponse {
+    async fn handle_append_command(&mut self, mut cmd: AppendCommand) -> ServerResponse {
         // Check if the mailbox exists
         let mailbox = sqlx::query!("SELECT name FROM mailboxes WHERE name = $1", cmd.mailbox)
             .fetch_optional(&*self.db_pool)
@@ -219,15 +220,61 @@ impl IMAPSession {
 
         match cmd.message.take() {
             Some(message) => {
-                let (uidvalidity, uid) = self.store_appended_message(&cmd, &message).await;
-                AppendOkResponse::new(cmd.tag, uidvalidity, uid).into()
+                let (uid_validity, uid) = self.store_appended_message(&cmd, &message).await;
+                AppendOkResponse::new(cmd.tag, uid_validity, uid).into()
             }
             None => {
                 // synchronizing literal: tell the client to send the bytes,
                 // and remember we're mid-APPEND so the next read isn't parsed as a command
+                let tag = cmd.tag.clone();
                 self.expecting_append_mail = Some(cmd);
-                ContinuationResponse { tag: cmd.tag }.into() // encodes `+ ...\r\n`
+                ContinuationResponse { tag }.into() // encodes `+ ...\r\n`
             }
         }
+    }
+
+    /// Persist an appended message and allocate it a UID in `cmd.mailbox`.
+    /// Returns `(uid_validity, uid)` for the `APPENDUID` response code.
+    async fn store_appended_message(&self, cmd: &AppendCommand, message: &[u8]) -> (u32, u32) {
+        let email = Email::from_raw(String::from_utf8_lossy(message).into_owned());
+
+        let mut tx = self
+            .db_pool
+            .begin()
+            .await
+            .expect("failed to open APPEND transaction");
+
+        let allocated = sqlx::query!(
+            "UPDATE mailboxes SET uid_next = uid_next + 1 WHERE name = $1 \
+             RETURNING (uid_next - 1) AS \"uid!\", uid_validity",
+            cmd.mailbox,
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .expect("failed to allocate APPEND uid");
+
+        sqlx::query!(
+            "INSERT INTO mail (mailbox_id, uid, message_id, sender, recipient_to, recipient_cc, subject, sent_date, body_text, raw_eml) \
+             VALUES ((SELECT id FROM mailboxes WHERE name = $1), $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            cmd.mailbox,
+            allocated.uid,
+            email.message_id,
+            email.sender,
+            email.recipients_to.join(";"),
+            email.recipients_cc.join(";"),
+            email.subject,
+            email.sent_date,
+            email.body,
+            email.raw,
+        )
+        .execute(&mut *tx)
+        .await
+        .expect("failed to insert appended message");
+
+        tx.commit()
+            .await
+            .expect("failed to commit appended message");
+
+        (allocated.uid_validity as u32, allocated.uid as u32)
     }
 }

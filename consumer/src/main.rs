@@ -2,9 +2,7 @@ use futures_lite::stream::StreamExt;
 use lapin::{Connection, ConnectionProperties, options::*, types::FieldTable};
 use sqlx::postgres::PgPoolOptions;
 
-use crate::email::Email;
-
-mod email;
+use util::Email;
 
 #[tokio::main]
 async fn main() {
