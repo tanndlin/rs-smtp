@@ -7,6 +7,7 @@ use crate::{
         AppendCommand, ClientCommand, ClientCommandTrait, FetchCommand, ListCommand, LogoutCommand,
         SelectCommand, StatusCommand,
     },
+    cursor::Cursor,
     response::{
         AppendOkResponse, CapabilityResponse, ContinuationResponse, Greeting, ListResponse,
         LoginResponse, LoginResult, LogoutResponse, MailboxListEntry, SelectResponse,
@@ -49,6 +50,34 @@ impl IMAPSession {
 
     pub fn is_logged_out(&self) -> bool {
         matches!(self.auth_state, SessionState::Logout)
+    }
+
+    pub async fn handle_bytes(
+        &mut self,
+        buf: &[u8],
+    ) -> Result<(ServerResponse, usize), ServerErrorResponse> {
+        if let Some(mut append_cmd) = self.expecting_append_mail.take() {
+            // Parse the rest of the message as the mail
+            let mut cursor = Cursor::new(buf);
+            let length = append_cmd.message_length;
+            // Grab the next {length} bytes
+            append_cmd.message = Some(cursor.raw(length).to_vec());
+            let res = self.handle_command(append_cmd.into()).await;
+            self.expecting_append_mail = None;
+            cursor.eat(b'\r')?;
+            cursor.eat(b'\n')?;
+            return Ok((res, length + 2));
+        }
+
+        match ClientCommand::parse_bytes(buf) {
+            Ok((command, read)) => {
+                dbg!(&command);
+                let res = self.handle_command(command).await;
+                dbg!(&res);
+                Ok((res, read))
+            }
+            Err(e) => Err(e.into()),
+        }
     }
 
     pub async fn handle_command(&mut self, command: ClientCommand) -> ServerResponse {

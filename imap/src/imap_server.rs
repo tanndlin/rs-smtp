@@ -6,7 +6,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-use crate::{command::ClientCommand, imap_session::IMAPSession};
+use crate::imap_session::IMAPSession;
 use util::EncodeTo;
 
 pub struct IMAPServer {
@@ -58,14 +58,10 @@ async fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Po
         println!("Read {bytes_read} bytes");
         bytes.extend_from_slice(&buf[..bytes_read]);
 
-        // TODO: This will probably break for multiline commands
         while bytes.windows(2).any(|window| window == b"\r\n") {
-            match ClientCommand::parse_bytes(&bytes) {
-                Ok((command, read)) => {
+            match state.handle_bytes(&bytes).await {
+                Ok((res, read)) => {
                     bytes.drain(0..read);
-                    dbg!(&command);
-                    let res = state.handle_command(command).await;
-                    dbg!(&res);
                     stream.write_all(&res.to_bytes()).await.unwrap();
 
                     if state.is_logged_out() {
@@ -74,7 +70,16 @@ async fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Po
                     }
                 }
                 Err(e) => {
-                    eprintln!("Failed to parse command from {addr}:\n{}", e.render(&bytes));
+                    eprintln!("Failed to parse command from {addr}:",);
+                    let reason = match e.reason {
+                        crate::response::ServerErrorReason::CommandParseError(e) => {
+                            e.render(&bytes)
+                        }
+                        crate::response::ServerErrorReason::ProtocolViolation(s) => s,
+                        crate::response::ServerErrorReason::Deny(s) => s,
+                    };
+                    eprintln!("{reason}");
+
                     let _ = stream.write_all(b"* BAD could not parse command\r\n").await;
                     // Drop what we have so we don't spin on the same bytes.
                     bytes.clear();

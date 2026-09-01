@@ -2,6 +2,7 @@ use std::fmt;
 use std::num::ParseIntError;
 
 use crate::errors::parse_error::ParseError;
+use crate::response::ServerErrorResponse;
 
 #[derive(Debug)]
 pub enum CommandParseError {
@@ -49,5 +50,14 @@ impl From<ParseIntError> for CommandParseError {
     #[track_caller]
     fn from(e: ParseIntError) -> Self {
         Self::ParseError(e.into())
+    }
+}
+
+impl From<CommandParseError> for ServerErrorResponse {
+    fn from(e: CommandParseError) -> Self {
+        Self {
+            tag: None,
+            reason: crate::response::ServerErrorReason::CommandParseError(e),
+        }
     }
 }

@@ -3,6 +3,8 @@ use std::num::ParseIntError;
 use std::panic::Location;
 use std::str::Utf8Error;
 
+use crate::response::{ServerErrorReason, ServerErrorResponse};
+
 /// A parse failure, carrying enough context to actually debug it:
 /// - `kind`: what went wrong
 /// - `pos`: byte offset into the command buffer where the parser stopped
@@ -98,5 +100,14 @@ impl From<Utf8Error> for ParseError {
     #[track_caller]
     fn from(e: Utf8Error) -> Self {
         Self::new(ParseErrorKind::Utf8Error(e), 0)
+    }
+}
+
+impl From<ParseError> for ServerErrorResponse {
+    fn from(e: ParseError) -> Self {
+        Self {
+            tag: None,
+            reason: ServerErrorReason::CommandParseError(e.into()),
+        }
     }
 }

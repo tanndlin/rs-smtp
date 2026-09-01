@@ -64,6 +64,43 @@ async fn append_with_synchronizing_literal_gets_continuation() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn append_with_synchronizing_literal_back_to_back() {
+    let addr = start_server().await;
+    let mut stream = connect_and_login(*addr);
+
+    // No `+`: the server must reply with a `+` continuation before the client
+    // sends the message octets.
+    stream.write_all(b"a2 APPEND INBOX {13}\r\n").unwrap();
+    let cont = read_available(&mut stream);
+    assert!(
+        cont.starts_with("+"),
+        "expected `+` continuation request, got: {cont:?}"
+    );
+
+    stream.write_all(b"Hello, World!\r\n").unwrap();
+    let resp = read_available(&mut stream);
+    assert!(
+        resp.contains("a2 OK") && resp.contains("APPEND completed"),
+        "expected tagged OK after literal: {resp:?}"
+    );
+
+    // Again
+    stream.write_all(b"a2 APPEND INBOX {13}\r\n").unwrap();
+    let cont = read_available(&mut stream);
+    assert!(
+        cont.starts_with("+"),
+        "expected `+` continuation request, got: {cont:?}"
+    );
+
+    stream.write_all(b"Hello, World!\r\n").unwrap();
+    let resp = read_available(&mut stream);
+    assert!(
+        resp.contains("a2 OK") && resp.contains("APPEND completed"),
+        "expected tagged OK after literal: {resp:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn append_accepts_flags_and_date_time() {
     let addr = start_server().await;
     let mut stream = connect_and_login(*addr);
