@@ -16,6 +16,14 @@ impl<'a> Cursor<'a> {
         self.buf.get(self.pos).copied()
     }
 
+    pub fn peek_nonspace(&self) -> Option<u8> {
+        let mut i = self.pos;
+        while self.buf.get(i) == Some(&b' ') {
+            i += 1;
+        }
+        self.buf.get(i).copied()
+    }
+
     pub fn eat(&mut self, b: u8) -> Result<(), ParseError> {
         if let Some(c) = self.peek()
             && c == b' '
@@ -157,7 +165,11 @@ impl<'a> Cursor<'a> {
         self.eat(b'(')?;
 
         let mut items = vec![];
-        items.push(f(self)?);
+        if let Some(next) = self.peek()
+            && next != b')'
+        {
+            items.push(f(self)?);
+        }
 
         while self
             .peek()
@@ -276,6 +288,12 @@ impl<'a> Cursor<'a> {
         Ok(Cow::Borrowed(
             str::from_utf8(&self.buf[start..self.pos]).unwrap(), // bytes are all ASCII
         ))
+    }
+
+    pub fn flag(&mut self) -> Result<Cow<'a, str>, ParseError> {
+        self.eat(b'\\')?;
+        let atom = self.atom()?;
+        Ok(Cow::Owned(format!("\\{atom}")))
     }
 }
 
