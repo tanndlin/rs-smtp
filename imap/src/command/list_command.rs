@@ -15,7 +15,7 @@ pub struct ListCommand {
 impl ClientCommandTrait for ListCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         let reference_name = cursor.string()?.to_string();
-        let mailbox = cursor.string()?.to_string();
+        let mailbox = cursor.list_mailbox()?.to_string();
 
         cursor.eat(b'\r')?;
         cursor.eat(b'\n')?;
@@ -82,5 +82,25 @@ mod tests {
         assert_eq!(cmd.tag, "A101");
         assert_eq!(cmd.reference_name, "/");
         assert_eq!(cmd.mailbox, "~/Mail/foo");
+    }
+
+    #[test]
+    fn parses_mailbox_wildcard() {
+        let (ClientCommand::List(cmd), _) =
+            ClientCommand::parse_bytes(b"A101 LIST \"\" ~/Mail/*\r\n").unwrap()
+        else {
+            panic!()
+        };
+
+        assert_eq!(cmd.tag, "A101");
+        assert_eq!(cmd.reference_name, "");
+        assert_eq!(cmd.mailbox, "~/Mail/*");
+    }
+
+    #[test]
+    fn reference_name_wildcard_throws() {
+        let Err(e) = ClientCommand::parse_bytes(b"A101 LIST * ~/Mail/foo\r\n") else {
+            panic!()
+        };
     }
 }

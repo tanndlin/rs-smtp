@@ -248,8 +248,43 @@ impl<'a> Cursor<'a> {
 
         Ok(str::from_utf8(&self.buf[start..self.pos]).unwrap()) // bytes are all ASCII
     }
+
+    /// `list-mailbox = 1*list-char / string`
+    ///
+    /// Like an atom, but the wildcards `%` / `*` and `]` are also allowed
+    /// unquoted. The quoted / literal forms are handled by `string`.
+    pub fn list_mailbox(&mut self) -> Result<Cow<'a, str>, ParseError> {
+        if let Some(c) = self.peek()
+            && c == b' '
+        {
+            self.skip_sp();
+        }
+
+        // Quoted string or literal: defer to `string`.
+        if matches!(self.peek(), Some(b'"' | b'{')) {
+            return self.string();
+        }
+
+        // Otherwise: 1*list-char.
+        let start = self.pos;
+        while self.peek().is_some_and(is_list_char) {
+            self.pos += 1;
+        }
+        if self.pos == start {
+            return Err(ParseError::expected_atom(self.pos));
+        }
+        Ok(Cow::Borrowed(
+            str::from_utf8(&self.buf[start..self.pos]).unwrap(), // bytes are all ASCII
+        ))
+    }
 }
 
 fn is_atom_char(b: u8) -> bool {
     matches!(b, 0x21..=0x7E) && !matches!(b, b'(' | b')' | b'{' | b'%' | b'*' | b'"' | b'\\' | b']')
+}
+
+/// `list-char = ATOM-CHAR / list-wildcards / resp-specials` — atom chars plus
+/// the wildcards `%` / `*` and the response special `]`.
+fn is_list_char(b: u8) -> bool {
+    is_atom_char(b) || matches!(b, b'%' | b'*' | b']')
 }
