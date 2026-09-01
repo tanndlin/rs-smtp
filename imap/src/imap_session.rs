@@ -4,7 +4,8 @@ use sqlx::{Pool, Postgres};
 
 use crate::{
     command::{
-        ClientCommand, FetchCommand, ListCommand, LogoutCommand, SelectCommand, StatusCommand,
+        ClientCommand, ClientCommandTrait, FetchCommand, ListCommand, LogoutCommand, SelectCommand,
+        StatusCommand,
     },
     response::{
         CapabilityResponse, Greeting, ListResponse, LoginResponse, LoginResult, LogoutResponse,
@@ -64,11 +65,21 @@ impl IMAPSession {
                     }
                 }
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
-                ClientCommand::List(_)
-                | ClientCommand::Select(_)
-                | ClientCommand::Status(_)
-                | ClientCommand::Fetch(_)
-                | ClientCommand::Append(_) => todo!("This should return an error"),
+                ClientCommand::List(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
+                ClientCommand::Select(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
+                ClientCommand::Status(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
+                ClientCommand::Fetch(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
+                ClientCommand::Append(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
             },
             SessionState::Authenticated => match command {
                 ClientCommand::List(cmd) => self.handle_list_command(cmd),

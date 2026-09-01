@@ -14,6 +14,10 @@ impl ClientCommandTrait for StartTLSCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         todo!()
     }
+
+    fn tag(&self) -> &str {
+        &self.tag
+    }
 }
 
 client_command_from_impl!(StartTLSCommand, StartTLS);

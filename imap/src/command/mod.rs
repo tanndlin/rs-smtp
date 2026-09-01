@@ -11,7 +11,7 @@ mod status_command;
 
 pub use append_command::AppendCommand;
 pub use capability_command::CapabilityCommand;
-pub use client_command::ClientCommand;
+pub use client_command::{ClientCommand, ClientCommandTrait};
 pub use fetch_command::FetchCommand;
 pub use list_command::ListCommand;
 pub use login_command::LoginCommand;

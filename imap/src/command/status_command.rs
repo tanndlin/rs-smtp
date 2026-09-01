@@ -46,6 +46,10 @@ impl ClientCommandTrait for StatusCommand {
             size,
         })
     }
+
+    fn tag(&self) -> &str {
+        &self.tag
+    }
 }
 
 client_command_from_impl!(StatusCommand, Status);

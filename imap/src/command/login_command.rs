@@ -22,6 +22,10 @@ impl ClientCommandTrait for LoginCommand {
 
         Ok(Self { tag, user, pass })
     }
+
+    fn tag(&self) -> &str {
+        &self.tag
+    }
 }
 
 client_command_from_impl!(LoginCommand, Login);

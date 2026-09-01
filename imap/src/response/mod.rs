@@ -14,6 +14,6 @@ pub use list_response::{ListResponse, MailboxListEntry};
 pub use login_response::{LoginResponse, LoginResult};
 pub use logout_response::LogoutResponse;
 pub use select_response::SelectResponse;
-pub use server_error_resonse::ServerErrorResponse;
+pub use server_error_resonse::{ServerErrorReason, ServerErrorResponse};
 pub use server_response::{ServerResponse, ServerResponseTrait};
 pub use status_response::StatusResponse;

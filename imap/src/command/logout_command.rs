@@ -16,6 +16,10 @@ impl ClientCommandTrait for LogoutCommand {
         cursor.eat(b'\n');
         Ok(Self { tag })
     }
+
+    fn tag(&self) -> &str {
+        &self.tag
+    }
 }
 
 client_command_from_impl!(LogoutCommand, Logout);

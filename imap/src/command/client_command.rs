@@ -5,6 +5,7 @@ use crate::{
     },
     cursor::Cursor,
     errors::CommandParseError,
+    response::{ServerErrorReason, ServerErrorResponse},
 };
 
 #[derive(Debug)]
@@ -46,6 +47,13 @@ impl ClientCommand {
 
 pub trait ClientCommandTrait: Sized {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError>;
+    fn tag(&self) -> &str;
+    fn protocol_violation(self, reason: String) -> ServerErrorResponse {
+        ServerErrorResponse {
+            tag: Some(self.tag().to_string()),
+            reason: ServerErrorReason::ProtocolViolation(reason),
+        }
+    }
 }
 
 #[macro_export]

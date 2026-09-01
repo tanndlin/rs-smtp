@@ -433,6 +433,10 @@ impl ClientCommandTrait for FetchCommand {
             fetch_list,
         })
     }
+
+    fn tag(&self) -> &str {
+        &self.tag
+    }
 }
 
 client_command_from_impl!(FetchCommand, Fetch);
