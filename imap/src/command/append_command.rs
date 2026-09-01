@@ -16,7 +16,7 @@ pub struct AppendCommand {
 
 impl ClientCommandTrait for AppendCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        let mailbox = cursor.atom().unwrap().to_string();
+        let mailbox = cursor.string().unwrap().to_string();
 
         // TODO: Any error will assume it meant empty flags
         let flags = cursor
