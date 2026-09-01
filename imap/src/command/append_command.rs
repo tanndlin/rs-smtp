@@ -11,6 +11,7 @@ pub struct AppendCommand {
     pub mailbox: String,
     pub flags: Vec<String>,
     pub date_time: Option<String>,
+    pub message_length: usize,
     pub message: Option<Vec<u8>>,
 }
 
@@ -30,27 +31,27 @@ impl ClientCommandTrait for AppendCommand {
         };
 
         cursor.eat(b'{')?;
-        let length = cursor.number()? as usize;
+        let message_length = cursor.number()? as usize;
         let sending_now = cursor.eat(b'+').is_ok();
         cursor.eat(b'}')?;
         cursor.eat(b'\r')?;
         cursor.eat(b'\n')?;
 
         let message = if sending_now {
-            let message = cursor.raw(length);
+            let message = cursor.raw(message_length);
+            cursor.eat(b'\r')?;
+            cursor.eat(b'\n')?;
             Some(message)
         } else {
             None
         };
-
-        cursor.eat(b'\r')?;
-        cursor.eat(b'\n')?;
 
         Ok(Self {
             tag,
             mailbox,
             flags,
             date_time,
+            message_length,
             message,
         })
     }
@@ -130,12 +131,13 @@ mod tests {
         let (cmd, _) = parse(b"a1 APPEND INBOX {13}\r\n");
 
         assert_eq!(cmd.mailbox, "INBOX");
+        assert_eq!(cmd.message_length, 13);
         assert_eq!(cmd.message, None);
     }
 
     #[test]
     fn message_bytes_are_preserved_verbatim() {
-        let raw = b"a1 APPEND INBOX {24+}\r\nSubject: hi\r\n\r\nbody line\r\n\r\n";
+        let raw = b"a1 APPEND INBOX {26+}\r\nSubject: hi\r\n\r\nbody line\r\n\r\n";
         let (cmd, _) = parse(raw);
 
         assert_eq!(
