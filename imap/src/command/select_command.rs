@@ -13,10 +13,10 @@ pub struct SelectCommand {
 
 impl ClientCommandTrait for SelectCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        let mailbox = cursor.atom().unwrap().to_string();
+        let mailbox = cursor.string().unwrap().to_string();
 
-        cursor.eat(b'\r');
-        cursor.eat(b'\n');
+        cursor.eat(b'\r')?;
+        cursor.eat(b'\n')?;
 
         Ok(Self { tag, mailbox })
     }
@@ -31,7 +31,7 @@ mod tests {
     #[test]
     fn parses_mailbox() {
         let (ClientCommand::Select(cmd), _) =
-            ClientCommand::parse_bytes(b"a69 SELECT INBOX").unwrap()
+            ClientCommand::parse_bytes(b"a69 SELECT INBOX\r\n").unwrap()
         else {
             panic!()
         };
