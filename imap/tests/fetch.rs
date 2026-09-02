@@ -21,6 +21,23 @@ Message-ID: <abc123@example.com>\r\n\
 \r\n\
 Hello, Bob.\r\n";
 
+/// A second message that populates every `ENVELOPE` address field with a
+/// distinct address, so `Sender`/`Reply-To`/`Cc`/`Bcc`/`In-Reply-To` can be
+/// checked against real header values instead of their From-derived/NIL
+/// defaults.
+const FULL_MESSAGE: &[u8] = b"Date: Thu, 24 Oct 2024 08:15:00 +0000\r\n\
+From: alice@example.com\r\n\
+Sender: carol@example.com\r\n\
+Reply-To: dave@example.com\r\n\
+To: bob@example.com\r\n\
+Cc: erin@example.com\r\n\
+Bcc: frank@example.com\r\n\
+In-Reply-To: <root123@example.com>\r\n\
+Subject: re: greetings\r\n\
+Message-ID: <def456@example.com>\r\n\
+\r\n\
+Hi Alice.\r\n";
+
 /// Connect, consume the greeting, and authenticate. Returns the live stream.
 fn connect_and_login(addr: SocketAddr) -> TcpStream {
     let mut stream = TcpStream::connect(addr).unwrap();
@@ -113,6 +130,70 @@ async fn fetch_rfc822_size_returns_size() {
     assert!(
         resp.contains(&format!("* 1 FETCH (RFC822.SIZE {size})")),
         "expected untagged `* 1 FETCH (RFC822.SIZE {size})`: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+    assert!(
+        resp.ends_with("\r\n"),
+        "completion line not CRLF-terminated: {resp:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_envelope() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 ENVELOPE\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    // RFC 9051 §7.5.2: env-structure is (date subject from sender reply-to
+    // to cc bcc in-reply-to message-id). MESSAGE has no Sender or Reply-To
+    // header, so both default to the From address; it has no Cc, Bcc, or
+    // In-Reply-To header, so those are NIL.
+    let expected = "* 1 FETCH (ENVELOPE (\"Wed, 23 Oct 2024 19:00:00 +0000\" \"greetings\" \
+        ((NIL NIL \"alice\" \"example.com\")) \
+        ((NIL NIL \"alice\" \"example.com\")) \
+        ((NIL NIL \"alice\" \"example.com\")) \
+        ((NIL NIL \"bob\" \"example.com\")) \
+        NIL NIL NIL \"<abc123@example.com>\"))";
+    assert!(
+        resp.contains(expected),
+        "expected untagged `{expected}`: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+    assert!(
+        resp.ends_with("\r\n"),
+        "completion line not CRLF-terminated: {resp:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_envelope_with_all_fields() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, FULL_MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 ENVELOPE\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    // Every address field comes from its own header this time, and
+    // In-Reply-To is present, so nothing falls back to a default or NIL.
+    let expected = "* 1 FETCH (ENVELOPE (\"Thu, 24 Oct 2024 08:15:00 +0000\" \"re: greetings\" \
+        ((NIL NIL \"alice\" \"example.com\")) \
+        ((NIL NIL \"carol\" \"example.com\")) \
+        ((NIL NIL \"dave\" \"example.com\")) \
+        ((NIL NIL \"bob\" \"example.com\")) \
+        ((NIL NIL \"erin\" \"example.com\")) \
+        ((NIL NIL \"frank\" \"example.com\")) \
+        \"<root123@example.com>\" \"<def456@example.com>\"))";
+    assert!(
+        resp.contains(expected),
+        "expected untagged `{expected}`: {resp:?}"
     );
     assert!(
         resp.contains("a4 OK") && resp.contains("FETCH completed"),
