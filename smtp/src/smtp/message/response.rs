@@ -6,6 +6,7 @@ pub enum Response {
     Ok,
     Closing,
     StartMailInput,
+    Unrecognized,
 }
 
 impl EncodeTo for Response {
@@ -15,6 +16,7 @@ impl EncodeTo for Response {
             Response::Ok => buf.extend(b"250 OK"),
             Response::Closing => buf.extend(b"221 rs-smtp v0.1 closing channel"),
             Response::StartMailInput => buf.extend(b"354 start mail input"),
+            Response::Unrecognized => buf.extend(b"500 5.5.1 Command unrecognized"),
         }
 
         buf.extend(b"\r\n");

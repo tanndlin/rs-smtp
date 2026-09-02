@@ -48,8 +48,20 @@ impl SMTPState {
             Request::Mail(mail) => self.handle_mail(mail),
             Request::Recipient(recipient) => self.handle_recipient(recipient),
             Request::Data => self.handle_data_command(),
+            Request::Reset => self.handle_reset(),
+            Request::Noop => Response::Ok,
             Request::Quit => Response::Closing,
         }
+    }
+
+    /// RFC 5321 4.1.1.5: RSET clears the current mail transaction (sender,
+    /// recipients, buffered data) but keeps the HELO/EHLO identity.
+    fn handle_reset(&mut self) -> Response {
+        self.from = None;
+        self.recipient.clear();
+        self.data.clear();
+        self.receiving_data = false;
+        Response::Ok
     }
 
     fn handle_extended_hello(&mut self, ehlo: ExtendedHelloMessage) -> Response {

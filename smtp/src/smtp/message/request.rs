@@ -8,6 +8,8 @@ pub enum Request {
     Mail(MailMessage),
     Recipient(RecipientMessage),
     Data,
+    Reset,
+    Noop,
     Quit,
 }
 
@@ -22,6 +24,8 @@ impl TryFrom<String> for Request {
             "MAIL" => Request::Mail(MailMessage::from(rest)),
             "RCPT" => Request::Recipient(RecipientMessage::from(rest)),
             "DATA" => Request::Data,
+            "RSET" => Request::Reset,
+            "NOOP" => Request::Noop,
             "QUIT" => Request::Quit,
             _ => return Err(format!("Unknown command: {command}")),
         })

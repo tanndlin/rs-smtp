@@ -61,16 +61,22 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: &Arc<Mute
 
     let mut state = SMTPState::new(move |email| handle_mail_received(email, &channel));
     let mut line_parser = LineParser::new(stream.try_clone().unwrap());
-    #[cfg(debug_assertions)]
-    println!("Connected to client: {addr}");
+    println!("[{addr}] connected");
 
     let ready = Response::Ready(Ready::new());
     ready.write_to(&mut stream).unwrap();
 
     while let Ok(message) = line_parser.next_line() {
         if !state.receiving_data {
-            let command = Request::try_from(message).unwrap();
-            let response = state.handle_message(command);
+            // An unrecognized verb must not take down the connection thread —
+            // reply 500 and keep going (Gmail & other MTAs send RSET/NOOP/etc).
+            let response = match Request::try_from(message) {
+                Ok(command) => state.handle_message(command),
+                Err(e) => {
+                    println!("[{addr}] {e}");
+                    Response::Unrecognized
+                }
+            };
 
             if matches!(response, Response::Closing) {
                 response.write_to(&mut stream).unwrap();
@@ -83,11 +89,17 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: &Arc<Mute
         }
     }
 
-    #[cfg(debug_assertions)]
-    dbg!("Connection closed with peer: {addr}");
+    println!("[{addr}] connection closed");
 }
 
 fn handle_mail_received(email: Email, channel: &Channel) {
+    println!(
+        "accepted mail from <{}> for [{}] ({} bytes)",
+        email.from,
+        email.to.join(", "),
+        email.data.len()
+    );
+
     let mut headers = BTreeMap::new();
     headers.insert("from".to_string(), AmqpValue::LongString(email.from));
     headers.insert(
