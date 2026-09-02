@@ -1,18 +1,19 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use sqlx::{Pool, Postgres};
 
 use crate::{
     command::{
-        AppendCommand, ClientCommand, ClientCommandTrait, FetchCommand, ListCommand, LogoutCommand,
-        SelectCommand, StatusCommand,
+        AppendCommand, ClientCommand, ClientCommandTrait, FetchCommand, Fetchable, ListCommand,
+        LogoutCommand, SelectCommand, StatusCommand,
     },
     cursor::Cursor,
+    handle_fetch::get_fetchable,
     response::{
-        AppendOkResponse, CapabilityResponse, ContinuationResponse, Greeting, ListResponse,
-        LoginResponse, LoginResult, LogoutResponse, MailboxListEntry, SelectResponse,
-        ServerErrorReason, ServerErrorResponse, ServerResponse, ServerResponseTrait,
-        StatusResponse,
+        AppendOkResponse, CapabilityResponse, ContinuationResponse, FetchMessageResponse,
+        FetchResponse, Greeting, ListResponse, LoginResponse, LoginResult, LogoutResponse,
+        MailboxListEntry, SelectResponse, ServerErrorReason, ServerErrorResponse, ServerResponse,
+        ServerResponseTrait, StatusResponse,
     },
 };
 use util::Email;
@@ -231,7 +232,25 @@ impl IMAPSession {
     }
 
     async fn handle_fetch_command(&self, cmd: FetchCommand) -> ServerResponse {
-        todo!()
+        // `*` in a sequence set refers to the last message in the mailbox.
+        let last = sqlx::query_scalar!("SELECT COUNT(*) FROM mail")
+            .fetch_one(&*self.db_pool)
+            .await
+            .expect("failed to count messages")
+            .unwrap_or(0) as u64;
+
+        let mut responses = Vec::new();
+        for message_id in cmd.sequence.to_message_ids(last) {
+            let mut metadata: HashMap<String, String> = HashMap::new();
+            for fetchable in &cmd.fetch_list {
+                let value = get_fetchable(self.db_pool.clone(), message_id, fetchable).await;
+                metadata.insert(fetchable.to_string(), value);
+            }
+
+            responses.push(FetchMessageResponse::new(message_id, metadata));
+        }
+
+        FetchResponse::new(cmd.tag, responses).into()
     }
 
     async fn handle_append_command(&mut self, mut cmd: AppendCommand) -> ServerResponse {

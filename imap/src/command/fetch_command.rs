@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, fmt, str::FromStr};
 
 use crate::{
     client_command_from_impl,
@@ -22,6 +22,40 @@ pub enum Sequence {
         end: FetchIndicator,
     },
     Mix(Vec<Sequence>),
+}
+
+impl Sequence {
+    pub fn to_message_ids(&self, last: u64) -> Vec<u64> {
+        fn resolve(indicator: &FetchIndicator, last: u64) -> u64 {
+            match indicator {
+                FetchIndicator::Index(i) => *i,
+                FetchIndicator::Wild => last,
+            }
+        }
+
+        match self {
+            Sequence::Single(indicator) => match resolve(indicator, last) {
+                n if (1..=last).contains(&n) => vec![n],
+                _ => vec![],
+            },
+            Sequence::Range { start, end } => {
+                let a = resolve(start, last);
+                let b = resolve(end, last);
+                let lo = a.min(b).max(1);
+                let hi = a.max(b).min(last);
+                (lo..=hi).collect()
+            }
+            Sequence::Mix(sequences) => {
+                let mut ids: Vec<u64> = sequences
+                    .iter()
+                    .flat_map(|sequence| sequence.to_message_ids(last))
+                    .collect();
+                ids.sort_unstable();
+                ids.dedup();
+                ids
+            }
+        }
+    }
 }
 
 impl FromStr for Sequence {
@@ -76,7 +110,7 @@ impl FromStr for FetchIndicator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Fetchable {
     All,
     Fast,
@@ -192,6 +226,111 @@ impl FromStr for BinaryFetchable {
             partial,
         })
     }
+}
+
+/// Renders a `Fetchable` as the message-data-item name a FETCH *response*
+/// uses (RFC 9051 §7.5.2), i.e. the key half of an `att value` pair. The
+/// `.PEEK` request modifier is dropped — a response is always the plain
+/// `BODY[...]` form.
+impl fmt::Display for Fetchable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Fetchable::All => f.write_str("ALL"),
+            Fetchable::Fast => f.write_str("FAST"),
+            Fetchable::Full => f.write_str("FULL"),
+            Fetchable::Binary(binary) => write!(f, "{binary}"),
+            Fetchable::Body(body) => write!(f, "{body}"),
+            Fetchable::BodyStructure => f.write_str("BODYSTRUCTURE"),
+            Fetchable::Envelope => f.write_str("ENVELOPE"),
+            Fetchable::Flags => f.write_str("FLAGS"),
+            Fetchable::Internaldate => f.write_str("INTERNALDATE"),
+            Fetchable::RFC822Size => f.write_str("RFC822.SIZE"),
+            Fetchable::UID => f.write_str("UID"),
+        }
+    }
+}
+
+impl fmt::Display for BodyFetchable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BodyFetchable::Full => f.write_str("BODY"),
+            BodyFetchable::Section {
+                peek: _,
+                section,
+                partial,
+            } => {
+                write!(f, "BODY[{section}]")?;
+                if let Some(partial) = partial {
+                    write!(f, "{partial}")?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl fmt::Display for BinaryFetchable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinaryFetchable::Size { part } => write!(f, "BINARY.SIZE[{}]", join_parts(part)),
+            BinaryFetchable::Content {
+                peek: _,
+                part,
+                partial,
+            } => {
+                write!(f, "BINARY[{}]", join_parts(part))?;
+                if let Some(partial) = partial {
+                    write!(f, "{partial}")?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl fmt::Display for Section {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Section::Full => Ok(()),
+            Section::Msg(text) => write!(f, "{text}"),
+            Section::Part { part, text } => {
+                write!(f, "{}", join_parts(part))?;
+                if let Some(text) = text {
+                    write!(f, ".{text}")?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl fmt::Display for SectionText {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SectionText::Header => f.write_str("HEADER"),
+            SectionText::HeaderFields(fields) => write!(f, "HEADER.FIELDS ({})", fields.join(" ")),
+            SectionText::HeaderFieldsNot(fields) => {
+                write!(f, "HEADER.FIELDS.NOT ({})", fields.join(" "))
+            }
+            SectionText::Text => f.write_str("TEXT"),
+            SectionText::Mime => f.write_str("MIME"),
+        }
+    }
+}
+
+impl fmt::Display for Partial {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<{}.{}>", self.start, self.count)
+    }
+}
+
+/// Join a section-part path back into its dotted form: `[1, 2, 3]` -> `"1.2.3"`.
+fn join_parts(parts: &[u32]) -> String {
+    parts
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 /// Parse a `[section-part]` (numbered parts only, e.g. `[1.2]` or `[]`).
@@ -422,10 +561,21 @@ impl ClientCommandTrait for FetchCommand {
             Err(_) => vec![cursor.fetch_att()?],
         };
 
+        // TODO: Technically a macro cannot be in a paren list but i dont feel like enforcing that rn
         let fetch_list = items
             .into_iter()
             .map(Fetchable::from_str)
             .collect::<Result<Vec<_>, _>>()?;
+
+        if (fetch_list.contains(&Fetchable::All)
+            || fetch_list.contains(&Fetchable::Full)
+            || fetch_list.contains(&Fetchable::Fast))
+            && fetch_list.len() != 1
+        {
+            return Err(CommandParseError::MalformedCommand(Some(format!(
+                "FETCH Command can only have 1 macro: Got: {fetch_list:?}"
+            ))));
+        }
 
         Ok(Self {
             tag,
