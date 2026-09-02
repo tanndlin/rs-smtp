@@ -10,7 +10,7 @@ use crate::{
 #[derive(Debug)]
 pub struct FetchCommand {
     pub tag: String,
-    pub sequence: Sequence,
+    pub sequences: Vec<Sequence>,
     pub fetch_list: Vec<Fetchable>,
 }
 
@@ -21,11 +21,11 @@ pub enum Sequence {
         start: FetchIndicator,
         end: FetchIndicator,
     },
-    Mix(Vec<Sequence>),
 }
 
+// TODO: I hate this API
 impl Sequence {
-    pub fn to_message_ids(&self, last: u64) -> Vec<u64> {
+    pub fn single_to_message_ids(&self, last: u64) -> Vec<u64> {
         fn resolve(indicator: &FetchIndicator, last: u64) -> u64 {
             match indicator {
                 FetchIndicator::Index(i) => *i,
@@ -45,47 +45,17 @@ impl Sequence {
                 let hi = a.max(b).min(last);
                 (lo..=hi).collect()
             }
-            Sequence::Mix(sequences) => {
-                let mut ids: Vec<u64> = sequences
-                    .iter()
-                    .flat_map(|sequence| sequence.to_message_ids(last))
-                    .collect();
-                ids.sort_unstable();
-                ids.dedup();
-                ids
-            }
         }
     }
-}
 
-impl FromStr for Sequence {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let sets = s.split(',').collect::<Vec<_>>();
-        if sets.len() > 1 {
-            return Ok(Sequence::Mix(
-                sets.iter()
-                    .copied()
-                    .map(Sequence::from_str)
-                    .map(|s| s.unwrap())
-                    .collect(),
-            ));
-        }
-
-        let set = sets[0];
-        let indicators = set.split(':').collect::<Vec<_>>();
-        if indicators.len() == 1 {
-            return Ok(Sequence::Single(FetchIndicator::from_str(indicators[0])?));
-        }
-        if indicators.len() == 2 {
-            Ok(Sequence::Range {
-                start: FetchIndicator::from_str(indicators[0])?,
-                end: FetchIndicator::from_str(indicators[1])?,
-            })
-        } else {
-            Err(())
-        }
+    pub fn to_message_ids(sequences: &[Self], last: u64) -> Vec<u64> {
+        let mut ids: Vec<u64> = sequences
+            .iter()
+            .flat_map(|sequence| sequence.single_to_message_ids(last))
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
     }
 }
 
@@ -96,17 +66,16 @@ pub enum FetchIndicator {
 }
 
 impl FromStr for FetchIndicator {
-    type Err = ();
+    type Err = CommandParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s == "*" {
             return Ok(Self::Wild);
         }
 
-        match s.parse() {
-            Ok(n) => Ok(FetchIndicator::Index(n)),
-            Err(_) => Err(()),
-        }
+        dbg!(&s);
+
+        Ok(FetchIndicator::Index(s.parse()?))
     }
 }
 
@@ -552,7 +521,33 @@ impl FromStr for Partial {
 
 impl ClientCommandTrait for FetchCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        let sequence = Sequence::from_str(cursor.atom().unwrap()).unwrap();
+        let sequences = {
+            let mut sequences = vec![];
+            loop {
+                let start = cursor.sequence_indicator()?;
+                dbg!(&start);
+                if let Some(next) = cursor.peek_nonspace()
+                    && next == b':'
+                {
+                    cursor.eat(b':').unwrap();
+                    let end = cursor.sequence_indicator()?;
+                    dbg!(&end);
+                    sequences.push(Sequence::Range { start, end })
+                } else {
+                    sequences.push(Sequence::Single(start))
+                }
+
+                if let Some(next) = cursor.peek_nonspace()
+                    && next != b','
+                {
+                    break;
+                }
+                cursor.eat(b',').unwrap();
+            }
+
+            dbg!(&sequences);
+            sequences
+        };
 
         // A FETCH takes either a parenthesized list of items, or a single
         // bare item with no parens (e.g. `FETCH 1 BODY`).
@@ -579,7 +574,7 @@ impl ClientCommandTrait for FetchCommand {
 
         Ok(Self {
             tag,
-            sequence,
+            sequences,
             fetch_list,
         })
     }
@@ -602,8 +597,9 @@ mod tests {
             panic!("expected ClientCommand::Fetch, got {cmd:?}");
         };
 
+        assert!(cmd.sequences.len() == 1);
         assert!(matches!(
-            cmd.sequence,
+            cmd.sequences[0],
             Sequence::Single(FetchIndicator::Index(1))
         ));
         assert!(cmd.fetch_list.len() == 1);
@@ -620,10 +616,59 @@ mod tests {
             panic!("expected ClientCommand::Fetch, got {cmd:?}");
         };
 
+        assert!(cmd.sequences.len() == 1);
         assert!(matches!(
-            cmd.sequence,
+            cmd.sequences[0],
             Sequence::Single(FetchIndicator::Index(1))
         ));
+        assert!(cmd.fetch_list.len() == 1);
+        assert!(matches!(
+            cmd.fetch_list[0],
+            Fetchable::Body(BodyFetchable::Full)
+        ));
+    }
+
+    #[test]
+    fn parses_single_wild() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH * BODY\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        assert!(cmd.sequences.len() == 1);
+        assert!(matches!(
+            cmd.sequences[0],
+            Sequence::Single(FetchIndicator::Wild)
+        ));
+        assert!(cmd.fetch_list.len() == 1);
+        assert!(matches!(
+            cmd.fetch_list[0],
+            Fetchable::Body(BodyFetchable::Full)
+        ));
+    }
+
+    #[test]
+    fn parses_sequence_wild() {
+        let buf = b"a1 FETCH 1:* BODY\r\n";
+        let cmd = match ClientCommand::parse_bytes(buf) {
+            Ok((cmd, _)) => cmd,
+            Err(e) => {
+                eprintln!("{}", e.render(buf));
+                panic!()
+            }
+        };
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+
+        assert!(matches!(
+            cmd.sequences[0],
+            Sequence::Range {
+                start: FetchIndicator::Index(1),
+                end: FetchIndicator::Wild
+            }
+        ));
+
         assert!(cmd.fetch_list.len() == 1);
         assert!(matches!(
             cmd.fetch_list[0],
@@ -638,12 +683,13 @@ mod tests {
             panic!("expected ClientCommand::Fetch, got {cmd:?}");
         };
 
-        let Sequence::Range { start, end } = cmd.sequence else {
-            panic!()
-        };
-
-        assert!(matches!(start, FetchIndicator::Index(1)));
-        assert!(matches!(end, FetchIndicator::Index(9)));
+        assert!(matches!(
+            cmd.sequences[0],
+            Sequence::Range {
+                start: FetchIndicator::Index(1),
+                end: FetchIndicator::Index(9)
+            }
+        ));
 
         assert!(cmd.fetch_list.len() == 1);
         assert!(matches!(

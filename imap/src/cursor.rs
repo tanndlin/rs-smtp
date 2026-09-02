@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
-use crate::errors::ParseError;
+use crate::{command::FetchIndicator, errors::ParseError};
 
+#[derive(Debug)]
 pub struct Cursor<'a> {
     buf: &'a [u8],
     pub pos: usize,
@@ -294,6 +295,20 @@ impl<'a> Cursor<'a> {
         self.eat(b'\\')?;
         let atom = self.atom()?;
         Ok(Cow::Owned(format!("\\{atom}")))
+    }
+
+    pub fn sequence_indicator(&mut self) -> Result<FetchIndicator, ParseError> {
+        // Either a number or a wild
+        if let next = self
+            .peek_nonspace()
+            .ok_or(ParseError::out_of_bytes(self.pos))?
+            && next == b'*'
+        {
+            self.eat(b'*').unwrap();
+            return Ok(FetchIndicator::Wild);
+        }
+
+        self.number().map(FetchIndicator::Index)
     }
 }
 

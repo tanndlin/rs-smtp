@@ -12,7 +12,7 @@ mod status_command;
 pub use append_command::AppendCommand;
 pub use capability_command::CapabilityCommand;
 pub use client_command::{ClientCommand, ClientCommandTrait};
-pub use fetch_command::{FetchCommand, Fetchable};
+pub use fetch_command::{FetchCommand, FetchIndicator, Fetchable, Sequence};
 pub use list_command::ListCommand;
 pub use login_command::LoginCommand;
 pub use logout_command::LogoutCommand;
