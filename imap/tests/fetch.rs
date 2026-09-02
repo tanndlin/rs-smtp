@@ -102,6 +102,29 @@ async fn fetch_last_returns_uid() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn fetch_rfc822_size_returns_size() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 RFC822.SIZE\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    let size = MESSAGE.len();
+    assert!(
+        resp.contains(&format!("* 1 FETCH (RFC822.SIZE {size})")),
+        "expected untagged `* 1 FETCH (RFC822.SIZE {size})`: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+    assert!(
+        resp.ends_with("\r\n"),
+        "completion line not CRLF-terminated: {resp:?}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn fetch_flags_empty_by_default() {
     let addr = start_server().await;
     let mut stream = login_with_message(*addr, MESSAGE);
