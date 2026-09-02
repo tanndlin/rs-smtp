@@ -1,75 +1,93 @@
 use std::sync::Arc;
 
 use sqlx::{Pool, Postgres};
+use util::Email;
 
 use crate::command::Fetchable;
 
-// Returns the fetchable result as a string to encode to response
+/// Render one FETCH data item as the string to splice into the response.
 pub async fn get_fetchable(
     db_pool: Arc<Pool<Postgres>>,
     message_id: u64,
     fetchable: &Fetchable,
 ) -> String {
+    let id = message_id as i32;
+
+    // UID is storage bookkeeping, not part of the message - look it up directly.
+    if let Fetchable::UID = fetchable {
+        return get_uid(&db_pool, id).await;
+    }
+
+    let email = Email::fetch(&*db_pool, id)
+        .await
+        .expect("failed to load message for FETCH");
+
     match fetchable {
+        Fetchable::Envelope => envelope(&email),
+        Fetchable::RFC822Size => email.raw_eml.len().to_string(),
         Fetchable::All => todo!(),
         Fetchable::Fast => todo!(),
         Fetchable::Full => todo!(),
-        Fetchable::Binary(binary_fetchable) => todo!(),
-        Fetchable::Body(body_fetchable) => todo!(),
+        Fetchable::Binary(_) => todo!(),
+        Fetchable::Body(_) => todo!(),
         Fetchable::BodyStructure => todo!(),
-        Fetchable::Envelope => get_envelope(db_pool, message_id).await,
         Fetchable::Flags => todo!(),
         Fetchable::Internaldate => todo!(),
-        Fetchable::RFC822Size => get_rfc822_size(db_pool, message_id).await,
-        Fetchable::UID => get_uid(db_pool, message_id).await,
+        Fetchable::UID => unreachable!("handled above"),
     }
 }
 
-async fn get_envelope(db_pool: Arc<Pool<Postgres>>, message_id: u64) -> String {
-    let raw = sqlx::query!("SELECT raw_eml from mail WHERE id = $1", message_id as i32)
-        .fetch_one(&*db_pool)
-        .await
-        .unwrap()
-        .raw_eml
-        .unwrap();
+fn envelope(email: &Email) -> String {
+    // Sender / Reply-To default to From when the message carried no such header.
+    let from = addrs_from_str(&email.from);
+    let sender = email
+        .sender
+        .as_deref()
+        .map(addrs_from_str)
+        .unwrap_or_else(|| from.clone());
+    let reply_to = email
+        .reply_to
+        .as_deref()
+        .map(addrs_from_str)
+        .unwrap_or_else(|| from.clone());
 
-    let headers = raw.split("\r\n\r\n").next().unwrap_or(&raw);
-    let from = address_list(headers, "From");
-    // Sender / Reply-To default to From when the message has no header of
-    // their own (RFC 9051 §7.5.2).
-    let sender = address_list(headers, "Sender").or_else(|| from.clone());
-    let reply_to = address_list(headers, "Reply-To").or_else(|| from.clone());
+    let date = email
+        .sent_date
+        .map(|d| quote(&d.to_rfc2822()))
+        .unwrap_or_else(nil);
+    let subject = nstring(email.subject.as_deref());
+    let in_reply_to = bracketed_id(email.in_reply_to.as_deref());
+    let message_id = bracketed_id(email.message_id.as_deref());
 
     let fields = [
-        nstring(header(headers, "Date")),
-        nstring(header(headers, "Subject")),
-        from.unwrap_or_else(nil),
-        sender.unwrap_or_else(nil),
-        reply_to.unwrap_or_else(nil),
-        address_list(headers, "To").unwrap_or_else(nil),
-        address_list(headers, "Cc").unwrap_or_else(nil),
-        address_list(headers, "Bcc").unwrap_or_else(nil),
-        nstring(header(headers, "In-Reply-To")),
-        nstring(header(headers, "Message-ID")),
+        date,
+        subject,
+        from,
+        sender,
+        reply_to,
+        addrs_from_vec(&email.recipients_to),
+        addrs_from_vec(&email.recipients_cc),
+        addrs_from_vec(&email.recipients_bcc),
+        in_reply_to,
+        message_id,
     ];
 
     format!("({})", fields.join(" "))
 }
 
-/// Look up a header's raw value (trimmed, `\r\n`-folded lines not handled -
-/// none of the messages we build test with need it) within a header block.
-fn header<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
-    let prefix = format!("{name}:").to_ascii_lowercase();
-    headers
-        .split("\r\n")
-        .find(|line| line.to_ascii_lowercase().starts_with(&prefix))
-        .map(|line| line[prefix.len()..].trim())
-}
-
-/// An IMAP `nstring`: a quoted string, or `NIL` when the header is absent.
+/// An IMAP `nstring`: a quoted string, or `NIL` when the value is absent.
 fn nstring(value: Option<&str>) -> String {
     match value {
         Some(v) => quote(v),
+        None => nil(),
+    }
+}
+
+/// A stored message-id (angle brackets stripped) rendered as the envelope
+/// wants it: `"<id>"`, or `NIL`.
+fn bracketed_id(id: Option<&str>) -> String {
+    match id {
+        Some(id) => quote(&format!("<{id}>")),
         None => nil(),
     }
 }
@@ -82,27 +100,33 @@ fn nil() -> String {
     "NIL".to_string()
 }
 
-/// Render a comma-separated address header as an IMAP address list:
-/// `((name adl mailbox host) ...)`, or `None` when the header is absent.
-fn address_list(headers: &str, name: &str) -> Option<String> {
-    let raw = header(headers, name)?;
-    let addresses: String = raw
-        .split(',')
+fn addrs_from_str(raw: &str) -> String {
+    render_addrs(std::iter::once(raw))
+}
+
+fn addrs_from_vec(entries: &[String]) -> String {
+    render_addrs(entries.iter().map(String::as_str))
+}
+
+/// Render address entries as an IMAP address list `((name adl mailbox host) ...)`,
+/// or `NIL` when there are none. Each entry may itself be comma-separated.
+fn render_addrs<'a>(entries: impl Iterator<Item = &'a str>) -> String {
+    let rendered: String = entries
+        .flat_map(|entry| entry.split(','))
         .map(str::trim)
         .filter(|entry| !entry.is_empty())
         .map(address)
         .collect();
 
-    if addresses.is_empty() {
-        None
+    if rendered.is_empty() {
+        nil()
     } else {
-        Some(format!("({addresses})"))
+        format!("({rendered})")
     }
 }
 
 /// Render one `name <mailbox@host>` / `mailbox@host` entry as an IMAP
-/// `address` structure. `adl` (source-route) is always `NIL` - nothing here
-/// produces or consumes source-routed addresses.
+/// `address` structure. `adl` (source-route) is always `NIL`.
 fn address(entry: &str) -> String {
     let (name, addr) = match entry.rfind('<') {
         Some(start) if entry.ends_with('>') => {
@@ -119,24 +143,11 @@ fn address(entry: &str) -> String {
     format!("({} NIL {} {host})", nstring(name), quote(mailbox))
 }
 
-// TODO: Fetch the mail once and pass through
-async fn get_uid(db_pool: Arc<Pool<Postgres>>, message_id: u64) -> String {
-    let uid = sqlx::query!("SELECT uid from mail WHERE id = $1", message_id as i32)
-        .fetch_one(&*db_pool)
+async fn get_uid(db_pool: &Pool<Postgres>, id: i32) -> String {
+    sqlx::query!("SELECT uid FROM mail WHERE id = $1", id)
+        .fetch_one(db_pool)
         .await
-        .unwrap()
-        .uid; // TODO: Check for 404
-
-    uid.to_string()
-}
-
-async fn get_rfc822_size(db_pool: Arc<Pool<Postgres>>, message_id: u64) -> String {
-    let raw = sqlx::query!("SELECT raw_eml from mail WHERE id = $1", message_id as i32)
-        .fetch_one(&*db_pool)
-        .await
-        .unwrap()
-        .raw_eml
-        .unwrap();
-
-    raw.len().to_string()
+        .unwrap() // TODO: Check for 404
+        .uid
+        .to_string()
 }

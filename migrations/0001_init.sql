@@ -10,15 +10,19 @@ INSERT INTO "mailboxes" (name) VALUES ('INBOX') ON CONFLICT (name) DO NOTHING;
 CREATE TABLE IF NOT EXISTS "mail" (
     id SERIAL PRIMARY KEY,
     message_id VARCHAR(255) UNIQUE,
+    in_reply_to VARCHAR(255),
     uid INTEGER NOT NULL,
+    "from" VARCHAR(255) NOT NULL,
     sender VARCHAR(255),
-    recipient_to TEXT,
-    recipient_cc TEXT,
+    reply_to VARCHAR(255),
+    recipients_to TEXT[] NOT NULL DEFAULT '{}',
+    recipients_cc TEXT[] NOT NULL DEFAULT '{}',
+    recipients_bcc TEXT[] NOT NULL DEFAULT '{}',
     subject VARCHAR(500),
     sent_date TIMESTAMPTZ,
     body_text TEXT,
     body_html TEXT,
-    raw_eml TEXT,
+    raw_eml TEXT NOT NULL,
     mailbox_id INTEGER REFERENCES "mailboxes"(id) ON DELETE CASCADE,
     CONSTRAINT mail_uid_unique UNIQUE (mailbox_id, uid)
 );

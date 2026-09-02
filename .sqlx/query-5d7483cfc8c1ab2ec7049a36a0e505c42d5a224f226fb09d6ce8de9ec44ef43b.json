@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT uid FROM mail WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uid",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "uid"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5d7483cfc8c1ab2ec7049a36a0e505c42d5a224f226fb09d6ce8de9ec44ef43b"
+}

@@ -3142,6 +3142,7 @@ name = "util"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "sqlx",
 ]
 
 [[package]]

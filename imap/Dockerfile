@@ -25,7 +25,7 @@ RUN cargo build --release -p imap
 RUN rm -rf util/src imap/src
 
 COPY migrations ./migrations
-COPY imap/.sqlx ./imap/.sqlx
+COPY .sqlx ./.sqlx
 
 # Copy real source and touch entrypoints so cargo knows to recompile
 COPY util/src ./util/src

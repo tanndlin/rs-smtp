@@ -1,0 +1,172 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT message_id, in_reply_to, \"from\", sender, reply_to,\n                      recipients_to, recipients_cc, recipients_bcc,\n                      subject, sent_date, body_text, body_html, raw_eml\n               FROM mail WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "in_reply_to",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "in_reply_to"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "from",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "from"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "sender",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "sender"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "reply_to",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "reply_to"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "recipients_to",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "recipients_to"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "recipients_cc",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "recipients_cc"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "recipients_bcc",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "recipients_bcc"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "subject",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "sent_date",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "sent_date"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "body_text",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "body_text"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "body_html",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "body_html"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "raw_eml",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "raw_eml"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "93da1b81f554e3ef0ae164407707cff1f7814285e2d66b8741e71f0f3cd7175a"
+}

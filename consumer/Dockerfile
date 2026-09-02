@@ -25,7 +25,7 @@ RUN cargo build --release -p consumer
 RUN rm -rf util/src consumer/src
 
 COPY migrations ./migrations
-COPY consumer/.sqlx ./consumer/.sqlx
+COPY .sqlx ./.sqlx
 
 # Copy real source and touch main.rs so cargo knows to recompile
 COPY util/src ./util/src

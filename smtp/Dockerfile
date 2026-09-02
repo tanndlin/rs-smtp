@@ -4,6 +4,10 @@
 FROM rust:1.98 AS builder
 WORKDIR /app
 
+# No DB reachable during `docker build`, so sqlx::query! (used by the util crate)
+# must check against the committed .sqlx/ offline cache instead of a live database.
+ENV SQLX_OFFLINE=true
+
 COPY Cargo.toml Cargo.lock ./
 COPY util/Cargo.toml util/Cargo.toml
 COPY consumer/Cargo.toml consumer/Cargo.toml
@@ -19,6 +23,8 @@ RUN mkdir -p util/src consumer/src imap/src smtp/src \
     && echo "fn main() {}" > smtp/src/main.rs
 RUN cargo build --release -p smtp
 RUN rm -rf util/src smtp/src
+
+COPY .sqlx ./.sqlx
 
 # Copy real source and touch main.rs so cargo knows to recompile
 COPY util/src ./util/src

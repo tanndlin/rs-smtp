@@ -301,23 +301,10 @@ impl IMAPSession {
         .await
         .expect("failed to allocate APPEND uid");
 
-        sqlx::query!(
-            "INSERT INTO mail (mailbox_id, uid, message_id, sender, recipient_to, recipient_cc, subject, sent_date, body_text, raw_eml) \
-             VALUES ((SELECT id FROM mailboxes WHERE name = $1), $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-            cmd.mailbox,
-            allocated.uid,
-            email.message_id,
-            email.sender,
-            email.recipients_to.join(";"),
-            email.recipients_cc.join(";"),
-            email.subject,
-            email.sent_date,
-            email.body,
-            email.raw,
-        )
-        .execute(&mut *tx)
-        .await
-        .expect("failed to insert appended message");
+        email
+            .insert(&mut *tx, &cmd.mailbox, allocated.uid)
+            .await
+            .expect("failed to insert appended message");
 
         tx.commit()
             .await

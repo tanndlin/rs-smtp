@@ -57,7 +57,7 @@ async fn main() {
         let delivery = delivery.expect("Failed to receive message");
 
         let headers = delivery.properties.headers().as_ref().unwrap();
-        let sender = headers
+        let from = headers
             .inner()
             .get("from")
             .unwrap()
@@ -76,13 +76,13 @@ async fn main() {
             .collect();
 
         let body = String::from_utf8_lossy(&delivery.data).into_owned();
-        let email = Email::new(sender, recipients, body);
+        let email = Email::new(from, recipients, body);
 
         println!("Received message");
-        println!("From: {}", email.sender);
+        println!("From: {}", email.from);
         println!("To: {}", email.recipients_to.join(", "));
         println!("----------------- Body -----------------");
-        println!("{}", email.body);
+        println!("{}", email.body_text.as_deref().unwrap_or_default());
 
         let mut tx = db_pool.begin().await.unwrap();
         let uid = sqlx::query_scalar!(
@@ -93,25 +93,8 @@ async fn main() {
         .await
         .unwrap();
 
-        let result = sqlx::query!(
-            "INSERT INTO mail (mailbox_id, uid, message_id, sender, recipient_to, recipient_cc, subject, sent_date, body_text, raw_eml) \
-             VALUES ((SELECT id FROM mailboxes WHERE name = $1), $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-            "INBOX",
-            uid,
-            email.message_id,
-            email.sender,
-            email.recipients_to.join(";"),
-            email.recipients_cc.join(";"),
-            email.subject,
-            email.sent_date,
-            email.body,
-            email.raw,
-        )
-        .execute(&mut *tx)
-        .await;
-
-        match result {
-            Ok(_) => {
+        match email.insert(&mut *tx, "INBOX", uid).await {
+            Ok(()) => {
                 if let Err(err) = tx.commit().await {
                     eprintln!("Failed to commit mail transaction: {err}");
                 }
