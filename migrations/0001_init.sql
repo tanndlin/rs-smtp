@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS "mail" (
     recipients_to TEXT[] NOT NULL DEFAULT '{}',
     recipients_cc TEXT[] NOT NULL DEFAULT '{}',
     recipients_bcc TEXT[] NOT NULL DEFAULT '{}',
+    flags TEXT[] NOT NULL DEFAULT '{}',
     subject VARCHAR(500),
     sent_date TIMESTAMPTZ,
     body_text TEXT,

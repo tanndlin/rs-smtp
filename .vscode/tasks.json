@@ -1,17 +1,93 @@
 {
     "version": "2.0.0",
+    "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+            "executable": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-Command"
+            ]
+        }
+    },
     "tasks": [
         {
-            "label": "build raytracer",
+            "label": "db: up",
+            "detail": "Start the Postgres container and block until it accepts connections.",
             "type": "shell",
-            "command": "cargo build --package raytracer",
+            "command": "docker compose up -d --wait db",
+            "problemMatcher": []
+        },
+        {
+            "label": "db: down",
+            "detail": "Stop the Postgres container.",
+            "type": "shell",
+            "command": "docker compose down db",
+            "problemMatcher": []
+        },
+        {
+            "label": "sqlx: migrate",
+            "detail": "Apply pending migrations to the running dev database.",
+            "type": "shell",
+            "command": "cargo sqlx migrate run",
+            "options": {
+                "env": {
+                    "DATABASE_URL": "postgresql://user:password@localhost:5432/tmail"
+                }
+            },
+            "dependsOn": "db: up",
+            "problemMatcher": []
+        },
+        {
+            "label": "sqlx: prepare",
+            "detail": "Refresh the .sqlx offline query cache for the whole workspace, then commit it.",
+            "type": "shell",
+            "command": "cargo sqlx prepare --workspace",
+            "options": {
+                "env": {
+                    "DATABASE_URL": "postgresql://user:password@localhost:5432/tmail"
+                }
+            },
+            "dependsOn": "sqlx: migrate",
+            "problemMatcher": [
+                "$rustc"
+            ]
+        },
+        {
+            "label": "build (online)",
+            "detail": "Ensure the dev DB is up and migrated, then build with query macros checked live.",
+            "type": "shell",
+            "command": "cargo build",
+            "options": {
+                "env": {
+                    "DATABASE_URL": "postgresql://user:password@localhost:5432/tmail"
+                }
+            },
+            "dependsOn": "sqlx: migrate",
             "group": {
-                "kind": "build",
-                "isDefault": true
+                "kind": "build"
             },
             "problemMatcher": [
                 "$rustc"
             ]
         },
+        {
+            "label": "build (offline)",
+            "detail": "Build against the committed .sqlx cache with no database.",
+            "type": "shell",
+            "command": "cargo build",
+            "options": {
+                "env": {
+                    "SQLX_OFFLINE": "true"
+                }
+            },
+            "group": {
+                "isDefault": true,
+                "kind": "build"
+            },
+            "problemMatcher": [
+                "$rustc"
+            ]
+        }
     ]
 }

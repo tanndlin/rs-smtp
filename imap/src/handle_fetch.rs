@@ -31,7 +31,7 @@ pub async fn get_fetchable(
         Fetchable::Binary(_) => todo!(),
         Fetchable::Body(_) => todo!(),
         Fetchable::BodyStructure => todo!(),
-        Fetchable::Flags => todo!(),
+        Fetchable::Flags => format!("({})", email.flags.join(" ")),
         Fetchable::Internaldate => todo!(),
         Fetchable::UID => unreachable!("handled above"),
     }

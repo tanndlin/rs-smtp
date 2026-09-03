@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO mail\n                 (mailbox_id, uid, message_id, in_reply_to, \"from\", sender, reply_to,\n                  recipients_to, recipients_cc, recipients_bcc, flags,\n                  subject, sent_date, body_text, body_html, raw_eml)\n               VALUES\n                 ((SELECT id FROM mailboxes WHERE name = $1),\n                  $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int4",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Varchar",
+        "Timestamptz",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e020a664a0f703e6cf62423fccab5204a2f39125c7a6e4e82608baa0933709c3"
+}

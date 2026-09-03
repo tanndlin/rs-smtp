@@ -11,6 +11,7 @@ pub struct Email {
     pub recipients_to: Vec<String>,
     pub recipients_cc: Vec<String>,
     pub recipients_bcc: Vec<String>,
+    pub flags: Vec<String>,
     pub subject: Option<String>,
     pub sent_date: Option<DateTime<Utc>>,
     pub body_text: Option<String>,
@@ -107,6 +108,7 @@ impl Email {
             recipients_to,
             recipients_cc,
             recipients_bcc,
+            flags: vec![],
             subject,
             sent_date,
             body_text,
@@ -129,6 +131,7 @@ impl Email {
             recipients_to,
             recipients_cc,
             recipients_bcc,
+            flags,
             subject,
             sent_date,
             body_text,
@@ -139,11 +142,11 @@ impl Email {
         sqlx::query!(
             r#"INSERT INTO mail
                  (mailbox_id, uid, message_id, in_reply_to, "from", sender, reply_to,
-                  recipients_to, recipients_cc, recipients_bcc,
+                  recipients_to, recipients_cc, recipients_bcc, flags,
                   subject, sent_date, body_text, body_html, raw_eml)
                VALUES
                  ((SELECT id FROM mailboxes WHERE name = $1),
-                  $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
+                  $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)"#,
             mailbox,
             uid,
             message_id,
@@ -154,6 +157,7 @@ impl Email {
             &recipients_to,
             &recipients_cc,
             &recipients_bcc,
+            &flags,
             subject,
             sent_date,
             body_text,
@@ -173,7 +177,7 @@ impl Email {
         sqlx::query_as!(
             Email,
             r#"SELECT message_id, in_reply_to, "from", sender, reply_to,
-                      recipients_to, recipients_cc, recipients_bcc,
+                      recipients_to, recipients_cc, recipients_bcc, flags,
                       subject, sent_date, body_text, body_html, raw_eml
                FROM mail WHERE id = $1"#,
             id,
