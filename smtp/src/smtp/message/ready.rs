@@ -16,6 +16,6 @@ impl Ready {
 impl EncodeTo for Ready {
     fn encode_to(self, buf: &mut Vec<u8>) {
         let message = format!("220 {} ready", self.message);
-        buf.extend(message.bytes());
+        buf.extend_from_slice(message.as_bytes());
     }
 }

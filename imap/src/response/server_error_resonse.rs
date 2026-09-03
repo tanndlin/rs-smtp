@@ -27,9 +27,11 @@ impl EncodeTo for ServerErrorResponse {
         match self.reason {
             ServerErrorReason::CommandParseError(_) => todo!(),
             ServerErrorReason::ProtocolViolation(reason) => {
-                buf.extend(format!("{tag} BAD {reason}\r\n").bytes())
+                buf.extend_from_slice(format!("{tag} BAD {reason}\r\n").as_bytes())
             }
-            ServerErrorReason::Deny(reason) => buf.extend(format!("{tag} NO {reason}\r\n").bytes()),
+            ServerErrorReason::Deny(reason) => {
+                buf.extend_from_slice(format!("{tag} NO {reason}\r\n").as_bytes())
+            }
         }
     }
 }

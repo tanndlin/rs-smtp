@@ -26,7 +26,7 @@ impl EncodeTo for FetchResponse {
         }
 
         let tag = self.request_tag;
-        buf.extend(format!("{tag} OK FETCH completed\r\n").bytes());
+        buf.extend_from_slice(format!("{tag} OK FETCH completed\r\n").as_bytes());
     }
 }
 
@@ -48,7 +48,7 @@ impl FetchMessageResponse {
 impl EncodeTo for FetchMessageResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {
         let message_id = self.message_id;
-        buf.extend(
+        buf.extend_from_slice(
             format!(
                 "* {message_id} FETCH ({})\r\n",
                 self.metadata
@@ -57,7 +57,7 @@ impl EncodeTo for FetchMessageResponse {
                     .collect::<Vec<_>>()
                     .join(" ")
             )
-            .bytes(),
+            .as_bytes(),
         );
     }
 }

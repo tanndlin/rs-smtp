@@ -47,13 +47,13 @@ impl EncodeTo for StatusResponse {
             deleted,
         } = self;
 
-        buf.extend(format!("* STATUS {mailbox} (").bytes());
+        buf.extend_from_slice(format!("* STATUS {mailbox} (").as_bytes());
         if let Some(messages) = messages {
             if *buf.last().unwrap() != b'(' {
                 buf.push(b'(');
             }
 
-            buf.extend(format!("MESSAGES {messages}").bytes());
+            buf.extend_from_slice(format!("MESSAGES {messages}").as_bytes());
         }
 
         if let Some(next_uid) = next_uid {
@@ -61,7 +61,7 @@ impl EncodeTo for StatusResponse {
                 buf.push(b'(');
             }
 
-            buf.extend(format!("UIDNEXT {next_uid}").bytes());
+            buf.extend_from_slice(format!("UIDNEXT {next_uid}").as_bytes());
         }
 
         if let Some(validity_uid) = validity_uid {
@@ -69,7 +69,7 @@ impl EncodeTo for StatusResponse {
                 buf.push(b'(');
             }
 
-            buf.extend(format!("UIDVAILIDITY {validity_uid}").bytes());
+            buf.extend_from_slice(format!("UIDVAILIDITY {validity_uid}").as_bytes());
         }
 
         if let Some(unseen) = unseen {
@@ -77,7 +77,7 @@ impl EncodeTo for StatusResponse {
                 buf.push(b'(');
             }
 
-            buf.extend(format!("UNSEEN {unseen}").bytes());
+            buf.extend_from_slice(format!("UNSEEN {unseen}").as_bytes());
         }
 
         if let Some(deleted) = deleted {
@@ -85,11 +85,11 @@ impl EncodeTo for StatusResponse {
                 buf.push(b'(');
             }
 
-            buf.extend(format!("DELETED {deleted}").bytes());
+            buf.extend_from_slice(format!("DELETED {deleted}").as_bytes());
         }
 
-        buf.extend(b")\r\n");
-        buf.extend(format!("{request_tag} OK STATUS completed\r\n").bytes());
+        buf.extend_from_slice(b")\r\n");
+        buf.extend_from_slice(format!("{request_tag} OK STATUS completed\r\n").as_bytes());
     }
 }
 

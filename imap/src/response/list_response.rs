@@ -44,9 +44,9 @@ impl EncodeTo for ListResponse {
                 .delimiter
                 .map(|c| format!("\"{c}\""))
                 .unwrap_or_else(|| "NIL".to_string());
-            buf.extend(format!("* LIST ({attrs}) {delim} {}\r\n", mbox.name).bytes());
+            buf.extend_from_slice(format!("* LIST ({attrs}) {delim} {}\r\n", mbox.name).as_bytes());
         }
-        buf.extend(format!("{tag} OK LIST completed\r\n").bytes());
+        buf.extend_from_slice(format!("{tag} OK LIST completed\r\n").as_bytes());
     }
 }
 

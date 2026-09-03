@@ -25,7 +25,7 @@ impl EncodeTo for LogoutResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {
         let tag = self.request_tag;
 
-        buf.extend(b"* BYE IMAP4rev1 Server logging out\r\n");
-        buf.extend(format!("{tag} OK LOGOUT completed\r\n").bytes());
+        buf.extend_from_slice(b"* BYE IMAP4rev1 Server logging out\r\n");
+        buf.extend_from_slice(format!("{tag} OK LOGOUT completed\r\n").as_bytes());
     }
 }

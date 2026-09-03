@@ -41,7 +41,7 @@ impl LineParser {
             return Err("Connection Closed".to_string());
         }
 
-        self.buf.extend(&self.read_buf[..bytes_read]);
+        self.buf.extend_from_slice(&self.read_buf[..bytes_read]);
         self.next_line()
     }
 }

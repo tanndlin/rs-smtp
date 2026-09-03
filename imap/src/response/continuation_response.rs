@@ -9,7 +9,7 @@ pub struct ContinuationResponse {
 
 impl EncodeTo for ContinuationResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {
-        buf.extend(b"+ pls\r\n");
+        buf.extend_from_slice(b"+ pls\r\n");
     }
 }
 

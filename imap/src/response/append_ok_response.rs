@@ -29,8 +29,9 @@ impl EncodeTo for AppendOkResponse {
             uid,
         } = self;
 
-        buf.extend(
-            format!("{request_tag} OK [APPENDUID {uid_validity} {uid}] APPEND completed\r\n").bytes(),
+        buf.extend_from_slice(
+            format!("{request_tag} OK [APPENDUID {uid_validity} {uid}] APPEND completed\r\n")
+                .as_bytes(),
         );
     }
 }

@@ -38,8 +38,12 @@ impl EncodeTo for LoginResponse {
         let tag = self.request_tag;
 
         match self.result {
-            LoginResult::Ok => buf.extend(format!("{tag} OK LOGIN completed\r\n").bytes()),
-            LoginResult::No => buf.extend(format!("{tag} No LOGIN incorrect creds\r\n").bytes()),
+            LoginResult::Ok => {
+                buf.extend_from_slice(format!("{tag} OK LOGIN completed\r\n").as_bytes())
+            }
+            LoginResult::No => {
+                buf.extend_from_slice(format!("{tag} No LOGIN incorrect creds\r\n").as_bytes())
+            }
         }
     }
 }

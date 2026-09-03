@@ -20,7 +20,9 @@ impl EncodeTo for CapabilityResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {
         let tag = self.request_tag;
 
-        buf.extend(format!("* CAPABILITY IMAP4rev2\r\n{tag} OK CAPABILITY completed\r\n").bytes());
+        buf.extend_from_slice(
+            format!("* CAPABILITY IMAP4rev2\r\n{tag} OK CAPABILITY completed\r\n").as_bytes(),
+        );
     }
 }
 
