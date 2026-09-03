@@ -24,7 +24,6 @@ impl ClientCommandTrait for StatusCommand {
         let mailbox = cursor.string()?.to_string();
 
         let flags = cursor.paren_list(|c| c.atom())?;
-        dbg!(&flags);
 
         let messages = flags.contains(&"MESSAGES");
         let next_uid = flags.contains(&"UIDNEXT");

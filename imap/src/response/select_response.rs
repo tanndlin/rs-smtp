@@ -30,12 +30,17 @@ impl EncodeTo for SelectResponse {
             validity_uid,
         } = self;
 
-        buf.extend(format!("* {exists} EXISTS\r\n").bytes());
-        buf.extend("* FLAGS (\\Deleted \\Seen)\r\n".to_string().bytes());
-        buf.extend(format!("* OK [UIDVALIDITY {validity_uid}] UIDs valid\r\n").bytes());
-        buf.extend(format!("* OK [UIDNEXT {next_uid}] Predicted next UID\r\n").bytes());
-
-        buf.extend(format!("{request_tag} OK [READ-WRITE] SELECT completed\r\n").bytes());
+        buf.extend_from_slice(format!("* {exists} EXISTS\r\n").as_bytes());
+        buf.extend_from_slice(b"* FLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft)\r\n");
+        buf.extend_from_slice(
+            format!("* OK [UIDVALIDITY {validity_uid}] UIDs valid\r\n").as_bytes(),
+        );
+        buf.extend_from_slice(
+            format!("* OK [UIDNEXT {next_uid}] Predicted next UID\r\n").as_bytes(),
+        );
+        buf.extend_from_slice(
+            format!("{request_tag} OK [READ-WRITE] SELECT completed\r\n").as_bytes(),
+        );
     }
 }
 

@@ -293,7 +293,7 @@ impl<'a> Cursor<'a> {
 
     pub fn flag(&mut self) -> Result<Cow<'a, str>, ParseError> {
         self.eat(b'\\')?;
-        let atom = self.atom()?;
+        let atom = self.atom()?.to_uppercase();
         Ok(Cow::Owned(format!("\\{atom}")))
     }
 

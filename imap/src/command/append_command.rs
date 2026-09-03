@@ -100,7 +100,7 @@ mod tests {
     fn parses_flag_list() {
         let (cmd, _) = parse(b"a1 APPEND INBOX (\\Seen \\Draft) {5+}\r\nhello\r\n");
 
-        assert_eq!(cmd.flags, vec!["\\Seen".to_string(), "\\Draft".to_string()]);
+        assert_eq!(cmd.flags, vec!["\\SEEN".to_string(), "\\DRAFT".to_string()]);
         assert_eq!(cmd.date_time, None);
     }
 
@@ -124,7 +124,7 @@ mod tests {
         let (cmd, _) =
             parse(b"a1 APPEND INBOX (\\Seen) \"23-Oct-2024 19:00:00 +0000\" {5+}\r\nhello\r\n");
 
-        assert_eq!(cmd.flags, vec!["\\Seen".to_string()]);
+        assert_eq!(cmd.flags, vec!["\\SEEN".to_string()]);
         assert_eq!(cmd.date_time.as_deref(), Some("23-Oct-2024 19:00:00 +0000"));
     }
 

@@ -21,8 +21,13 @@ use util::Email;
 pub struct IMAPSession {
     db_pool: Arc<Pool<Postgres>>,
     auth_state: SessionState,
-    selected_mailbox: Option<String>,
+    selected_mailbox: Option<SelectedMailbox>,
     expecting_append_mail: Option<AppendCommand>, // TODO: This doesnt support pipelining, but i haven't looked into how that actually works anyways
+}
+
+pub struct SelectedMailbox {
+    id: i32,
+    name: String,
 }
 
 #[derive(Default)]
@@ -140,13 +145,21 @@ impl IMAPSession {
             None,
             "Inbox".to_string(),
         );
-        let mailboxes = vec![inbox];
+        let mailboxes: Vec<MailboxListEntry> = vec![inbox];
         ListResponse::new(cmd.tag, mailboxes).into()
     }
 
     async fn handle_select_command(&mut self, cmd: SelectCommand) -> ServerResponse {
         assert!(cmd.mailbox == "INBOX");
-        self.selected_mailbox = Some(cmd.mailbox.clone());
+        let mailbox_id =
+            sqlx::query_scalar!("SELECT id FROM mailboxes WHERE name = $1", &cmd.mailbox)
+                .fetch_one(&*self.db_pool)
+                .await
+                .expect("Failed to fetch mailbox for id");
+        self.selected_mailbox = Some(SelectedMailbox {
+            id: mailbox_id,
+            name: cmd.mailbox.clone(),
+        });
 
         let exists: usize = sqlx::query_scalar!("SELECT COUNT(*) FROM mail")
             .fetch_one(&*self.db_pool)
@@ -163,7 +176,7 @@ impl IMAPSession {
 
         let validity_uid = sqlx::query_scalar!(
             "SELECT uid_validity FROM mailboxes WHERE name = $1",
-            self.selected_mailbox
+            self.selected_mailbox.as_ref().unwrap().name
         )
         .fetch_one(&*self.db_pool)
         .await
@@ -198,11 +211,12 @@ impl IMAPSession {
             None
         };
 
+        // TODO: Repeated SQL that can get merged
         let validity_uid = if cmd.validity_uid {
             Some(
                 sqlx::query_scalar!(
                     "SELECT uid_validity FROM mailboxes WHERE name = $1",
-                    self.selected_mailbox
+                    self.selected_mailbox.as_ref().unwrap().name
                 )
                 .fetch_one(&*self.db_pool)
                 .await
@@ -212,21 +226,36 @@ impl IMAPSession {
             None
         };
 
-        //TODO: After flags are added, this needs to be counted
         let unseen = if cmd.unseen {
             Some(
-                sqlx::query_scalar!("SELECT COUNT(*) FROM mail")
-                    .fetch_one(&*self.db_pool)
-                    .await
-                    .expect("failed to query mailbox message count")
-                    .unwrap_or(0) as u64,
+                sqlx::query_scalar!(
+                    "SELECT COUNT(*) FROM mail WHERE NOT ($1 = ANY(flags))",
+                    "\\Seen"
+                )
+                .fetch_one(&*self.db_pool)
+                .await
+                .expect("failed to query unseen count")
+                .unwrap_or(0) as u64,
             )
         } else {
             None
         };
 
-        //TODO: After flags are added, this needs to be counted
-        let deleted = if cmd.deleted { Some(0) } else { None };
+        //TODO: Flags lookups can get merged
+        let deleted = if cmd.deleted {
+            Some(
+                sqlx::query_scalar!(
+                    "SELECT COUNT(*) FROM mail WHERE NOT ($1 = ANY(flags))",
+                    "\\Deleted"
+                )
+                .fetch_one(&*self.db_pool)
+                .await
+                .expect("failed to query deleted count")
+                .unwrap_or(0) as u64,
+            )
+        } else {
+            None
+        };
 
         StatusResponse::new(cmd, messages, next_uid, validity_uid, unseen, deleted).into()
     }
