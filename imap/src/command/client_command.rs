@@ -27,7 +27,7 @@ impl ClientCommand {
         let tag = cursor.atom()?.to_string();
         let command_text = cursor.atom()?;
 
-        let cmd = match command_text {
+        let cmd = match command_text.to_uppercase().as_str() {
             "CAPABILITY" => CapabilityCommand::parse_bytes(tag, &mut cursor)?.into(),
             "STARTTLS" => StartTLSCommand::parse_bytes(tag, &mut cursor)?.into(),
             "LOGIN" => LoginCommand::parse_bytes(tag, &mut cursor)?.into(),
