@@ -556,7 +556,6 @@ impl ClientCommandTrait for FetchCommand {
             Err(_) => vec![cursor.fetch_att()?],
         };
 
-        // TODO: Technically a macro cannot be in a paren list but i dont feel like enforcing that rn
         let fetch_list = items
             .into_iter()
             .map(Fetchable::from_str)
