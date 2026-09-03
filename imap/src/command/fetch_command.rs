@@ -572,6 +572,9 @@ impl ClientCommandTrait for FetchCommand {
             ))));
         }
 
+        cursor.eat(b'\r')?;
+        cursor.eat(b'\n')?;
+
         Ok(Self {
             tag,
             sequences,
