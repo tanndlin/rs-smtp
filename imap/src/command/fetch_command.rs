@@ -98,7 +98,7 @@ impl FromStr for Fetchable {
     type Err = CommandParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let matches: HashMap<&str, fn(&str) -> Result<Self, Self::Err>> = HashMap::from([
+        let matches = HashMap::from([
             (
                 "ALL",
                 (|_: &str| Ok(Self::All)) as fn(&str) -> Result<Self, Self::Err>,
