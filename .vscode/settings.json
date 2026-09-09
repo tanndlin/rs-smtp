@@ -5,16 +5,30 @@
                 {
                     "name": "Run",
                     "commands": [
-                        "cargo watch -w src -x run -c"
+                        "cd imap",
+                        "Get-Content ../.env | Where-Object { $_ -match '=' } | ForEach-Object { $n, $v = $_.Split('=', 2); Set-Item -Path \"Env:$n\" -Value $v }",
+                        "$env:CARGO_TARGET_DIR = \"target/bacon-run\"; bacon run"
                     ]
                 },
+                {
+                    "name": "Test",
+                    "commands": [
+                        "cd imap",
+                        "Get-Content ../.env | Where-Object { $_ -match '=' } | ForEach-Object { $n, $v = $_.Split('=', 2); Set-Item -Path \"Env:$n\" -Value $v }",
+                        "$env:CARGO_TARGET_DIR = \"target/bacon-test\"; bacon test"
+                    ]
+                }
+            ],
+        },
+        {
+            "splitTerminals": [
                 {
                     "name": "Git",
                     "commands": [
                         "git status",
                     ]
                 }
-            ],
+            ]
         }
     ],
 }
