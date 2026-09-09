@@ -1,12 +1,12 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE mailboxes SET uid_next = uid_next + 1 WHERE name = $1 RETURNING (uid_next - 1) AS \"uid!\"",
+  "query": "SELECT COUNT(*) FROM mail WHERE NOT ($1 = ANY(flags))",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "uid!",
-        "type_info": "Int4",
+        "name": "count",
+        "type_info": "Int8",
         "origin": "Expression"
       }
     ],
@@ -19,5 +19,5 @@
       null
     ]
   },
-  "hash": "bd32973c77c5485b18b3cf0c756d39ca253af54581d6b5e3f6a00fbcb49553cf"
+  "hash": "a76851fa04d6a51eddc1c51244585841591b6552e121c2f461ff7410429497a3"
 }

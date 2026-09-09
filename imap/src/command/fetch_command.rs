@@ -525,13 +525,11 @@ impl ClientCommandTrait for FetchCommand {
             let mut sequences = vec![];
             loop {
                 let start = cursor.sequence_indicator()?;
-                dbg!(&start);
                 if let Some(next) = cursor.peek_nonspace()
                     && next == b':'
                 {
                     cursor.eat(b':').unwrap();
                     let end = cursor.sequence_indicator()?;
-                    dbg!(&end);
                     sequences.push(Sequence::Range { start, end })
                 } else {
                     sequences.push(Sequence::Single(start))
@@ -545,7 +543,6 @@ impl ClientCommandTrait for FetchCommand {
                 cursor.eat(b',').unwrap();
             }
 
-            dbg!(&sequences);
             sequences
         };
 

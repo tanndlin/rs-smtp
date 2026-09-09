@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::{
     client_command_from_impl,
     command::{ClientCommand, client_command::ClientCommandTrait},
@@ -5,7 +7,6 @@ use crate::{
     errors::CommandParseError,
 };
 
-#[derive(Debug)]
 pub struct AppendCommand {
     pub tag: String,
     pub mailbox: String,
@@ -13,6 +14,22 @@ pub struct AppendCommand {
     pub date_time: Option<String>,
     pub message_length: usize,
     pub message: Option<Vec<u8>>,
+}
+
+impl fmt::Debug for AppendCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AppendCommand")
+            .field("tag", &self.tag)
+            .field("mailbox", &self.mailbox)
+            .field("flags", &self.flags)
+            .field("date_time", &self.date_time)
+            .field("message_length", &self.message_length)
+            .field(
+                "message",
+                &self.message.as_deref().map(String::from_utf8_lossy),
+            )
+            .finish()
+    }
 }
 
 impl ClientCommandTrait for AppendCommand {
