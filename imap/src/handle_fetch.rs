@@ -3,7 +3,7 @@ use std::sync::Arc;
 use sqlx::{Pool, Postgres};
 use util::Email;
 
-use crate::command::{BodyFetchable, Fetchable, Section};
+use crate::command::{BodyFetchable, Fetchable, Section, SectionText};
 
 /// Render one FETCH data item as the string to splice into the response.
 pub async fn get_fetchable(
@@ -46,7 +46,17 @@ fn handle_body(email: Email, b: &BodyFetchable) -> String {
             partial,
         } => match section {
             Section::Full => format!("BODY[] {{{}}}\r\n{}", email.raw_eml.len(), email.raw_eml),
-            Section::Msg(section_text) => todo!(),
+            Section::Msg(section_text) => match section_text {
+                SectionText::Header => {
+                    let headers = email.get_headers();
+                    let len = headers.len();
+                    format!("BODY[HEADER] {{{len}}}\r\n{headers}")
+                }
+                SectionText::HeaderFields(items) => todo!(),
+                SectionText::HeaderFieldsNot(items) => todo!(),
+                SectionText::Text => todo!(),
+                SectionText::Mime => todo!(),
+            },
             Section::Part { part, text } => todo!(),
         },
     }

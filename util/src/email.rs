@@ -185,4 +185,9 @@ impl Email {
         .fetch_one(executor)
         .await
     }
+
+    pub fn get_headers(&self) -> String {
+        let (res, _) = self.raw_eml.split_once("\r\n\r\n").unwrap();
+        res.to_string()
+    }
 }
