@@ -27,8 +27,8 @@ pipeline {
         //     steps {
         //         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
         //             sh '''
-        //             docker run --rm $DOCKER_VOLS -w $WORKSPACE/smtp $RUST_IMAGE \
-        //                 sh -c "rustup component add clippy && cargo clippy --all-targets -- -D clippy::pedantic"
+        //             docker run --rm $DOCKER_VOLS -w $WORKSPACE $RUST_IMAGE \
+        //                 sh -c "rustup component add clippy && cargo clippy --workspace --all-targets -- -D clippy::pedantic"
         //             '''
         //         }
         //     }
@@ -38,8 +38,8 @@ pipeline {
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     sh '''
-                    docker run --rm $DOCKER_VOLS -w $WORKSPACE/smtp $RUST_IMAGE \
-                        sh -c "rustup component add rustfmt && cargo fmt -- --check"
+                    docker run --rm $DOCKER_VOLS -w $WORKSPACE $RUST_IMAGE \
+                        sh -c "rustup component add rustfmt && cargo fmt --all -- --check"
                     '''
                 }
             }
@@ -48,8 +48,8 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
-                docker run --rm $DOCKER_VOLS -w $WORKSPACE/smtp $RUST_IMAGE \
-                    sh -c "cargo build --release"
+                docker run --rm $DOCKER_VOLS -w $WORKSPACE $RUST_IMAGE \
+                    sh -c "cargo build --workspace --release"
                 '''
             }
         }
@@ -57,8 +57,8 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
-                docker run --rm $DOCKER_VOLS -w $WORKSPACE/smtp $RUST_IMAGE \
-                    sh -c "cargo test"
+                docker run --rm $DOCKER_VOLS -w $WORKSPACE $RUST_IMAGE \
+                    sh -c "cargo test --workspace"
                 '''
             }
         }
