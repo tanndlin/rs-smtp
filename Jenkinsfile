@@ -5,6 +5,9 @@ pipeline {
         GITHUB_TOKEN = credentials('GITHUB_TOKEN')
         DOCKER_VOLS = '-v jenkins_jenkins_home:/var/jenkins_home -v cargo-registry-cache:/usr/local/cargo/registry'
         RUST_IMAGE = 'rust:latest'
+        // No DB reachable in this container, so sqlx::query! macros must check
+        // against the committed .sqlx/ offline cache instead of a live database.
+        SQLX_OFFLINE = 'true'
     }
 
     stages {
@@ -48,7 +51,7 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
-                docker run --rm $DOCKER_VOLS -w $WORKSPACE $RUST_IMAGE \
+                docker run --rm $DOCKER_VOLS -e SQLX_OFFLINE -w $WORKSPACE $RUST_IMAGE \
                     sh -c "cargo build --workspace --release"
                 '''
             }
@@ -57,7 +60,7 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
-                docker run --rm $DOCKER_VOLS -w $WORKSPACE $RUST_IMAGE \
+                docker run --rm $DOCKER_VOLS -e SQLX_OFFLINE -w $WORKSPACE $RUST_IMAGE \
                     sh -c "cargo test --workspace"
                 '''
             }
