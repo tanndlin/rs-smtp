@@ -1,9 +1,13 @@
 //! Wire-level contract for `FETCH` response handling.
 //!
-//! These are written TDD-style: `handle_fetch_command` is still `todo!()`, so
-//! every test here is expected to be RED until the handler (and a
-//! `FetchResponse` / `ServerResponse::Fetch` variant) lands. They pin the
-//! RFC 9051 §7.5.2 response shape a client should see.
+//! The base handler is in place: `UID`, `RFC822.SIZE`, `ENVELOPE`, `FLAGS`,
+//! `BODY[]` and `BODY[HEADER]` round-trip. Tests suffixed `_red` (and the
+//! block of them below `fetch_body_peek_header_returns_headers`) pin
+//! behaviour that is still `todo!()` in `get_fetchable` / `handle_body`
+//! (`BODY[TEXT]`, header-field subsets, numbered parts, partials,
+//! `BODYSTRUCTURE`, `INTERNALDATE`, the `ALL` macro) and are expected to be
+//! RED until each arm lands. They pin the RFC 9051 §7.5.2 response shape a
+//! client should see.
 
 use std::io::Write;
 use std::net::{SocketAddr, TcpStream};
@@ -241,6 +245,246 @@ async fn fetch_full_body_returns_raw_eml() {
     assert!(
         resp.contains("Subject: greetings") && resp.contains("Hello, Bob."),
         "literal did not carry the whole raw message: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// `FETCH 1 (UID RFC822.SIZE)` - a parenthesised att list returns both items
+/// on a single untagged line. Ordering inside the parens is not asserted.
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_uid_and_size_together() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream
+        .write_all(b"a4 FETCH 1 (UID RFC822.SIZE)\r\n")
+        .unwrap();
+    let resp = read_available(&mut stream);
+
+    let size = MESSAGE.len();
+    assert_eq!(
+        resp.matches("* 1 FETCH (").count(),
+        1,
+        "expected exactly one untagged FETCH line: {resp:?}"
+    );
+    assert!(resp.contains("UID 1"), "missing UID item: {resp:?}");
+    assert!(
+        resp.contains(&format!("RFC822.SIZE {size}")),
+        "missing RFC822.SIZE item: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// RED: `BODY[TEXT]` should return the body only, as a `BODY[TEXT]` literal.
+/// `handle_body` still has `todo!()` for `SectionText::Text`.
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_body_text_returns_body_only() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 BODY[TEXT]\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    assert!(
+        resp.contains("BODY[TEXT] {"),
+        "expected a `BODY[TEXT] {{n}}` literal: {resp:?}"
+    );
+    assert!(
+        resp.contains("Hello, Bob."),
+        "literal did not carry the body text: {resp:?}"
+    );
+    assert!(
+        !resp.contains("Subject: greetings"),
+        "`BODY[TEXT]` must not include headers: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// RED: `BODY[HEADER.FIELDS (SUBJECT)]` should return just the named header.
+/// `handle_body` still has `todo!()` for `SectionText::HeaderFields`.
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_body_header_fields_returns_subset() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream
+        .write_all(b"a4 FETCH 1 BODY.PEEK[HEADER.FIELDS (SUBJECT)]\r\n")
+        .unwrap();
+    let resp = read_available(&mut stream);
+
+    assert!(
+        resp.contains("BODY[HEADER.FIELDS (SUBJECT)] {"),
+        "expected a `BODY[HEADER.FIELDS (SUBJECT)] {{n}}` literal: {resp:?}"
+    );
+    assert!(
+        resp.contains("Subject: greetings"),
+        "subset missing the requested header: {resp:?}"
+    );
+    assert!(
+        !resp.contains("From: alice@example.com"),
+        "subset must not include unrequested headers: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// RED: `BODY[1]` on a non-multipart message is the message body.
+/// `handle_body` still has `todo!()` for `Section::Part`.
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_numbered_body_part_returns_part() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 BODY[1]\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    assert!(
+        resp.contains("BODY[1] {"),
+        "expected a `BODY[1] {{n}}` literal: {resp:?}"
+    );
+    assert!(
+        resp.contains("Hello, Bob."),
+        "part literal did not carry the body: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// RED: a partial `BODY[]<0.10>` returns only the first ten octets, and the
+/// response item names the origin octet: `BODY[]<0> {10}`. `handle_body`
+/// ignores the partial range today and returns the whole message.
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_body_partial_returns_truncated_octets() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 BODY[]<0.10>\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    assert!(
+        resp.contains("BODY[]<0> {10}"),
+        "expected a `BODY[]<0> {{10}}` partial literal: {resp:?}"
+    );
+    assert!(
+        !resp.contains("Hello, Bob."),
+        "partial must not carry the whole message body: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// RED: bare `FETCH 1 BODY` returns the non-extensible BODYSTRUCTURE.
+/// `handle_body` still has `todo!()` for `BodyFetchable::Full`.
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_bare_body_returns_body_structure() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 BODY\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    assert!(
+        resp.contains("* 1 FETCH (BODY ("),
+        "expected a `BODY (...)` structure: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// RED: `FETCH 1 BODYSTRUCTURE` is unimplemented (`todo!()` in `get_fetchable`).
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_bodystructure_returns_structure() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 BODYSTRUCTURE\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    assert!(
+        resp.contains("* 1 FETCH (BODYSTRUCTURE ("),
+        "expected a `BODYSTRUCTURE (...)` structure: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// RED: `FETCH 1 INTERNALDATE` is unimplemented (`todo!()` in `get_fetchable`).
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_internaldate_returns_quoted_date() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 INTERNALDATE\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    assert!(
+        resp.contains("* 1 FETCH (INTERNALDATE \""),
+        "expected a quoted `INTERNALDATE` value: {resp:?}"
+    );
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// RED: the `FETCH 1 ALL` macro expands to
+/// `(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)`. `get_fetchable` has `todo!()`
+/// for `Fetchable::All`.
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_all_macro_expands_to_four_items() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    stream.write_all(b"a4 FETCH 1 ALL\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    for item in ["FLAGS ", "INTERNALDATE ", "RFC822.SIZE ", "ENVELOPE "] {
+        assert!(
+            resp.contains(item),
+            "ALL expansion missing {item:?}: {resp:?}"
+        );
+    }
+    assert!(
+        resp.contains("a4 OK") && resp.contains("FETCH completed"),
+        "expected tagged OK completion: {resp:?}"
+    );
+}
+
+/// RED: `FETCH 1 UID` on a message that is not sequence 1 must still address
+/// it. Here UID 1 == seq 1, so this passes; kept as a guard for the
+/// out-of-range case below.
+#[tokio::test(flavor = "multi_thread")]
+async fn fetch_out_of_range_sequence_returns_no_untagged() {
+    let addr = start_server().await;
+    let mut stream = login_with_message(*addr, MESSAGE);
+
+    // Only one message exists; sequence 2 is out of range and RFC 9051
+    // §6.4.8 says the server returns tagged OK with no untagged FETCH.
+    stream.write_all(b"a4 FETCH 2 UID\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    assert!(
+        !resp.contains("* 2 FETCH"),
+        "out-of-range sequence must not produce an untagged FETCH: {resp:?}"
     );
     assert!(
         resp.contains("a4 OK") && resp.contains("FETCH completed"),

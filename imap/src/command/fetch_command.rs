@@ -852,4 +852,204 @@ mod tests {
     fn binary_rejects_text_section() {
         assert!(ClientCommand::parse_bytes(b"a1 FETCH 1 BINARY[HEADER]\r\n").is_err());
     }
+
+    // ---------------------------------------------------------------------
+    // Additional coverage for the FETCH parser. The `*_red` tests below pin
+    // behaviour the parser does not implement yet and are expected to fail
+    // until it does.
+    // ---------------------------------------------------------------------
+
+    /// `FETCH 1 (FLAGS UID)` - a parenthesised att list yields one `Fetchable`
+    /// per entry, in order.
+    #[test]
+    fn parses_parenthesized_att_list() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 (FLAGS UID)\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+        assert_eq!(cmd.fetch_list, vec![Fetchable::Flags, Fetchable::UID]);
+    }
+
+    /// `FETCH 1 (BODY[HEADER.FIELDS (DATE FROM)] FLAGS)` - the parenthesised
+    /// header-field list inside `[...]` must not confuse the outer att list.
+    #[test]
+    fn parses_att_list_with_nested_header_field_parens() {
+        let (cmd, _) =
+            ClientCommand::parse_bytes(b"a1 FETCH 1 (BODY[HEADER.FIELDS (DATE FROM)] FLAGS)\r\n")
+                .unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+        assert_eq!(
+            cmd.fetch_list,
+            vec![
+                Fetchable::Body(BodyFetchable::Section {
+                    peek: false,
+                    section: Section::Msg(SectionText::HeaderFields(vec![
+                        "DATE".into(),
+                        "FROM".into(),
+                    ])),
+                    partial: None,
+                }),
+                Fetchable::Flags,
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_all_macro() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 ALL\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+        assert_eq!(cmd.fetch_list, vec![Fetchable::All]);
+    }
+
+    #[test]
+    fn parses_fast_and_full_macros() {
+        let (fast, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 FAST\r\n").unwrap();
+        let ClientCommand::Fetch(fast) = fast else {
+            panic!("expected ClientCommand::Fetch");
+        };
+        assert_eq!(fast.fetch_list, vec![Fetchable::Fast]);
+
+        let (full, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 FULL\r\n").unwrap();
+        let ClientCommand::Fetch(full) = full else {
+            panic!("expected ClientCommand::Fetch");
+        };
+        assert_eq!(full.fetch_list, vec![Fetchable::Full]);
+    }
+
+    /// A macro (`ALL` / `FAST` / `FULL`) may not be combined with other items.
+    #[test]
+    fn rejects_macro_mixed_with_other_att() {
+        assert!(ClientCommand::parse_bytes(b"a1 FETCH 1 (ALL FLAGS)\r\n").is_err());
+    }
+
+    /// `FETCH 1,3,5 UID` - a comma-separated sequence set becomes one
+    /// `Sequence::Single` per entry.
+    #[test]
+    fn parses_comma_separated_sequence_set() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1,3,5 UID\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+        assert_eq!(cmd.sequences.len(), 3);
+        assert!(matches!(
+            cmd.sequences[0],
+            Sequence::Single(FetchIndicator::Index(1))
+        ));
+        assert!(matches!(
+            cmd.sequences[1],
+            Sequence::Single(FetchIndicator::Index(3))
+        ));
+        assert!(matches!(
+            cmd.sequences[2],
+            Sequence::Single(FetchIndicator::Index(5))
+        ));
+    }
+
+    /// `FETCH 1,3:5 UID` - a set that mixes a single and a range.
+    #[test]
+    fn parses_mixed_single_and_range_sequence_set() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1,3:5 UID\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+        assert_eq!(cmd.sequences.len(), 2);
+        assert!(matches!(
+            cmd.sequences[0],
+            Sequence::Single(FetchIndicator::Index(1))
+        ));
+        assert!(matches!(
+            cmd.sequences[1],
+            Sequence::Range {
+                start: FetchIndicator::Index(3),
+                end: FetchIndicator::Index(5),
+            }
+        ));
+    }
+
+    #[test]
+    fn parses_body_text_section() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 BODY[TEXT]\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+        let Fetchable::Body(body) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Body, got {:?}", cmd.fetch_list[0]);
+        };
+        assert_eq!(
+            *body,
+            BodyFetchable::Section {
+                peek: false,
+                section: Section::Msg(SectionText::Text),
+                partial: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_header_fields_not_section() {
+        let (cmd, _) =
+            ClientCommand::parse_bytes(b"a1 FETCH 1 BODY.PEEK[HEADER.FIELDS.NOT (DATE)]\r\n")
+                .unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+        let Fetchable::Body(body) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Body, got {:?}", cmd.fetch_list[0]);
+        };
+        assert_eq!(
+            *body,
+            BodyFetchable::Section {
+                peek: true,
+                section: Section::Msg(SectionText::HeaderFieldsNot(vec!["DATE".into()])),
+                partial: None,
+            }
+        );
+    }
+
+    /// `BODY[]` with a partial range keeps the range on the response item.
+    #[test]
+    fn parses_full_body_with_partial() {
+        let (cmd, _) = ClientCommand::parse_bytes(b"a1 FETCH 1 BODY[]<0.10>\r\n").unwrap();
+        let ClientCommand::Fetch(cmd) = cmd else {
+            panic!("expected ClientCommand::Fetch, got {cmd:?}");
+        };
+        let Fetchable::Body(body) = &cmd.fetch_list[0] else {
+            panic!("expected Fetchable::Body, got {:?}", cmd.fetch_list[0]);
+        };
+        assert_eq!(
+            *body,
+            BodyFetchable::Section {
+                peek: false,
+                section: Section::Full,
+                partial: Some(Partial {
+                    start: 0,
+                    count: 10,
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn accepts_lowercase_att_name() {
+        let parsed = ClientCommand::parse_bytes(b"a1 FETCH 1 uid\r\n");
+        assert!(
+            parsed.is_ok(),
+            "lowercase att name should parse: {parsed:?}"
+        );
+    }
+
+    #[test]
+    fn accepts_lowercase_body_keyword() {
+        let parsed = ClientCommand::parse_bytes(b"a1 FETCH 1 body[]\r\n");
+        assert!(parsed.is_ok(), "lowercase BODY should parse: {parsed:?}");
+    }
+
+    #[test]
+    fn rejects_empty_att_list() {
+        assert!(ClientCommand::parse_bytes(b"a1 FETCH 1 ()\r\n").is_err());
+    }
 }

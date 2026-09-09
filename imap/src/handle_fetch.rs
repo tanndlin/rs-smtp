@@ -176,3 +176,157 @@ async fn get_uid(db_pool: &Pool<Postgres>, id: i32) -> String {
         .uid
         .to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::command::Partial;
+
+    /// A minimal RFC 5322 message: five header lines, the blank-line
+    /// separator, and one line of body.
+    const RAW: &str = "Date: Wed, 23 Oct 2024 19:00:00 +0000\r\n\
+From: alice@example.com\r\n\
+To: bob@example.com\r\n\
+Subject: greetings\r\n\
+Message-ID: <abc123@example.com>\r\n\
+\r\n\
+Hello, Bob.\r\n";
+
+    /// The body octets that follow the header separator in `RAW`.
+    const BODY: &str = "Hello, Bob.\r\n";
+
+    fn sample_email() -> Email {
+        Email::from_raw(RAW.to_string())
+    }
+
+    fn section(section: Section) -> BodyFetchable {
+        BodyFetchable::Section {
+            peek: false,
+            section,
+            partial: None,
+        }
+    }
+
+    // ------------------------- envelope (passing) -------------------------
+
+    /// `address` keeps a quoted display name and renders each comma-separated
+    /// recipient as its own `address` structure.
+    #[test]
+    fn envelope_renders_display_name_and_multiple_recipients() {
+        let raw = "Date: Thu, 24 Oct 2024 08:15:00 +0000\r\n\
+From: \"Alice Example\" <alice@example.com>\r\n\
+To: bob@example.com, carol@example.net\r\n\
+Subject: hi\r\n\
+Message-ID: <m1@example.com>\r\n\
+\r\n\
+body\r\n";
+        let env = envelope(&Email::from_raw(raw.to_string()));
+
+        assert!(
+            env.contains("((\"Alice Example\" NIL \"alice\" \"example.com\"))"),
+            "from address structure wrong: {env}"
+        );
+        assert!(
+            env.contains("((NIL NIL \"bob\" \"example.com\")(NIL NIL \"carol\" \"example.net\"))"),
+            "to address list wrong: {env}"
+        );
+    }
+
+    // --------------------------- body (RED) ------------------------------
+    //
+    // Every test below drives a `BODY[...]` section that `handle_body` still
+    // answers with `todo!()`. They pin the RFC 9051 §7.5.2 response item and
+    // are expected to fail until each arm is implemented.
+
+    /// RED: `BODY[TEXT]` returns only the body, keyed `BODY[TEXT]`.
+    #[test]
+    fn body_text_returns_body_only() {
+        let out = handle_body(sample_email(), &section(Section::Msg(SectionText::Text)));
+        assert_eq!(out, format!("BODY[TEXT] {{{}}}\r\n{BODY}", BODY.len()));
+    }
+
+    /// RED: `BODY[HEADER.FIELDS (SUBJECT)]` returns just the named header
+    /// line(s) plus the terminating CRLF, and nothing else.
+    #[test]
+    fn body_header_fields_returns_named_headers_only() {
+        let out = handle_body(
+            sample_email(),
+            &section(Section::Msg(SectionText::HeaderFields(vec![
+                "SUBJECT".into(),
+            ]))),
+        );
+        assert!(
+            out.starts_with("BODY[HEADER.FIELDS (SUBJECT)] {"),
+            "wrong response item key: {out:?}"
+        );
+        assert!(
+            out.contains("Subject: greetings"),
+            "missing Subject: {out:?}"
+        );
+        assert!(
+            !out.contains("From: alice@example.com"),
+            "must not include unlisted headers: {out:?}"
+        );
+    }
+
+    #[test]
+    fn body_header_fields_not_excludes_named_headers() {
+        let out = handle_body(
+            sample_email(),
+            &section(Section::Msg(SectionText::HeaderFieldsNot(vec![
+                "SUBJECT".into(),
+            ]))),
+        );
+        assert!(
+            out.starts_with("BODY[HEADER.FIELDS.NOT (SUBJECT)] {"),
+            "wrong response item key: {out:?}"
+        );
+        assert!(
+            out.contains("From: alice@example.com"),
+            "missing an un-excluded header: {out:?}"
+        );
+        assert!(
+            !out.contains("Subject: greetings"),
+            "excluded header still present: {out:?}"
+        );
+    }
+
+    /// RED: for a non-multipart message, `BODY[1]` is the message body.
+    #[test]
+    fn body_numbered_part_returns_part_payload() {
+        let out = handle_body(
+            sample_email(),
+            &section(Section::Part {
+                part: vec![1],
+                text: None,
+            }),
+        );
+        assert_eq!(out, format!("BODY[1] {{{}}}\r\n{BODY}", BODY.len()));
+    }
+
+    /// RED: bare `BODY` renders the non-extensible BODYSTRUCTURE, a
+    /// parenthesised structure keyed simply `BODY`.
+    #[test]
+    fn bare_body_renders_body_structure() {
+        let out = handle_body(sample_email(), &BodyFetchable::Full);
+        assert!(
+            out.starts_with("BODY (") || out.starts_with("BODY("),
+            "expected a parenthesised body structure: {out:?}"
+        );
+    }
+
+    /// RED: `BODY[]<0.5>` returns only the first five octets and the response
+    /// item carries the origin offset: `BODY[]<0> {5}`.
+    #[test]
+    fn body_full_with_partial_truncates_to_range() {
+        let out = handle_body(
+            sample_email(),
+            &BodyFetchable::Section {
+                peek: false,
+                section: Section::Full,
+                partial: Some(Partial { start: 0, count: 5 }),
+            },
+        );
+        assert_eq!(out, format!("BODY[]<0> {{5}}\r\n{}", &RAW[..5]));
+    }
+}

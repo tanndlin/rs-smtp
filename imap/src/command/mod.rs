@@ -13,8 +13,8 @@ pub use append_command::AppendCommand;
 pub use capability_command::CapabilityCommand;
 pub use client_command::{ClientCommand, ClientCommandTrait};
 pub use fetch_command::{
-    BinaryFetchable, BodyFetchable, FetchCommand, FetchIndicator, Fetchable, Section, SectionText,
-    Sequence,
+    BinaryFetchable, BodyFetchable, FetchCommand, FetchIndicator, Fetchable, Partial, Section,
+    SectionText, Sequence,
 };
 pub use list_command::ListCommand;
 pub use login_command::LoginCommand;
