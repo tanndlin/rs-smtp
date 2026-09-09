@@ -98,6 +98,7 @@ impl FromStr for Fetchable {
     type Err = CommandParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = &s.to_uppercase();
         let matches = HashMap::from([
             (
                 "ALL",
