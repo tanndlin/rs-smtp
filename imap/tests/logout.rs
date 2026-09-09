@@ -20,8 +20,13 @@ async fn logout_closes_connection() {
         "missing tagged OK: {resp:?}"
     );
 
-    stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
     let mut buf = [0u8; 16];
     let n = stream.read(&mut buf).unwrap();
-    assert_eq!(n, 0, "expected EOF after LOGOUT, server kept connection open");
+    assert_eq!(
+        n, 0,
+        "expected EOF after LOGOUT, server kept connection open"
+    );
 }
