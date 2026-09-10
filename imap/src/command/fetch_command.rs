@@ -569,6 +569,12 @@ impl ClientCommandTrait for FetchCommand {
             ))));
         }
 
+        if fetch_list.is_empty() {
+            return Err(CommandParseError::MalformedCommand(Some(
+                "FETCH command must have at least one attribute".to_string(),
+            )));
+        }
+
         cursor.eat(b'\r')?;
         cursor.eat(b'\n')?;
 
