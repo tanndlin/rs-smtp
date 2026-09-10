@@ -52,8 +52,38 @@ fn handle_body(email: Email, b: &BodyFetchable) -> String {
                     let len = headers.len();
                     format!("BODY[HEADER] {{{len}}}\r\n{headers}")
                 }
-                SectionText::HeaderFields(items) => todo!(),
-                SectionText::HeaderFieldsNot(items) => todo!(),
+                // TODO: This is ugly and O(nm)
+                SectionText::HeaderFields(items) => {
+                    let headers = email
+                        .get_headers()
+                        .split("\r\n")
+                        .filter(|h| items.iter().any(|i| h.to_uppercase().starts_with(i)))
+                        .collect::<Vec<_>>()
+                        .join("\r\n");
+                    let len = headers.len();
+                    format!(
+                        "BODY[HEADER.FIELDS ({})] {{{len}}}\r\n{headers}",
+                        items.join(" ")
+                    )
+                }
+                SectionText::HeaderFieldsNot(items) => {
+                    let headers = email
+                        .get_headers()
+                        .split("\r\n")
+                        .filter(|h| {
+                            !items.iter().any(|i| {
+                                dbg!(h, i, h.to_uppercase().starts_with(i));
+                                h.to_uppercase().starts_with(i)
+                            })
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\r\n");
+                    let len = headers.len();
+                    format!(
+                        "BODY[HEADER.FIELDS.NOT ({})] {{{len}}}\r\n{headers}",
+                        items.join(" ")
+                    )
+                }
                 SectionText::Text => todo!(),
                 SectionText::Mime => todo!(),
             },
