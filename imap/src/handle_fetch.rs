@@ -3,7 +3,7 @@ use std::sync::Arc;
 use sqlx::{Pool, Postgres};
 use util::Email;
 
-use crate::command::{BodyFetchable, Fetchable, Section, SectionText};
+use crate::command::{BodyFetchable, Fetchable, Partial, Section, SectionText};
 
 /// Render one FETCH data item as the string to splice into the response.
 pub async fn get_fetchable(
@@ -39,13 +39,29 @@ pub async fn get_fetchable(
 
 fn handle_body(email: Email, b: &BodyFetchable) -> String {
     match b {
-        BodyFetchable::Full => todo!(),
+        BodyFetchable::Full => {
+            let body = body_octets(&email.raw_eml);
+            format!(
+                "BODY (\"TEXT\" \"PLAIN\" (\"CHARSET\" \"US-ASCII\") NIL NIL \"7BIT\" {} {})",
+                body.len(),
+                body.matches("\r\n").count()
+            )
+        }
         BodyFetchable::Section {
-            peek,
+            peek: _,
             section,
             partial,
         } => match section {
-            Section::Full => format!("BODY[] {{{}}}\r\n{}", email.raw_eml.len(), email.raw_eml),
+            Section::Full => match partial {
+                None => format!("BODY[] {{{}}}\r\n{}", email.raw_eml.len(), email.raw_eml),
+                Some(Partial { start, count }) => {
+                    let raw = &email.raw_eml;
+                    let start = (*start as usize).min(raw.len());
+                    let end = start.saturating_add(*count as usize).min(raw.len());
+                    let slice = &raw[start..end];
+                    format!("BODY[]<{start}> {{{}}}\r\n{slice}", slice.len())
+                }
+            },
             Section::Msg(section_text) => match section_text {
                 SectionText::Header => {
                     let headers = email.get_headers();
@@ -70,12 +86,7 @@ fn handle_body(email: Email, b: &BodyFetchable) -> String {
                     let headers = email
                         .get_headers()
                         .split("\r\n")
-                        .filter(|h| {
-                            !items.iter().any(|i| {
-                                dbg!(h, i, h.to_uppercase().starts_with(i));
-                                h.to_uppercase().starts_with(i)
-                            })
-                        })
+                        .filter(|h| !items.iter().any(|i| h.to_uppercase().starts_with(i)))
                         .collect::<Vec<_>>()
                         .join("\r\n");
                     let len = headers.len();
@@ -84,12 +95,27 @@ fn handle_body(email: Email, b: &BodyFetchable) -> String {
                         items.join(" ")
                     )
                 }
-                SectionText::Text => todo!(),
+                SectionText::Text => {
+                    let body = body_octets(&email.raw_eml);
+                    format!("BODY[TEXT] {{{}}}\r\n{body}", body.len())
+                }
                 SectionText::Mime => todo!(),
             },
-            Section::Part { part, text } => todo!(),
+            Section::Part { part, text } => match (part.as_slice(), text) {
+                ([1], None) => {
+                    let body = body_octets(&email.raw_eml);
+                    format!("BODY[1] {{{}}}\r\n{body}", body.len())
+                }
+                _ => todo!(),
+            },
         },
     }
+}
+
+fn body_octets(raw: &str) -> &str {
+    raw.split_once("\r\n\r\n")
+        .map(|(_, body)| body)
+        .unwrap_or("")
 }
 
 fn envelope(email: &Email) -> String {
