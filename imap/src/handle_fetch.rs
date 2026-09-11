@@ -32,7 +32,7 @@ pub async fn get_fetchable(
         Fetchable::Body(b) => handle_body(email, b),
         Fetchable::BodyStructure => todo!(),
         Fetchable::Flags => format!("({})", email.flags.join(" ")),
-        Fetchable::Internaldate => todo!(),
+        Fetchable::Internaldate => internal_date(&email),
         Fetchable::UID => unreachable!("handled above"),
     }
 }
@@ -113,6 +113,12 @@ fn body_structure(email: &Email) -> String {
 
 fn body_octets(raw: &str) -> &str {
     raw.split_once("\r\n\r\n").map(|(_, body)| body).unwrap_or("")
+}
+
+/// The message's INTERNALDATE as an IMAP `date-time` quoted string, e.g.
+/// `"23-Oct-2024 19:00:00 +0000"`. The day is space-padded per RFC 9051.
+fn internal_date(email: &Email) -> String {
+    format!("\"{}\"", email.received_at.format("%e-%b-%Y %H:%M:%S %z"))
 }
 
 fn envelope(email: &Email) -> String {
@@ -234,6 +240,14 @@ async fn get_uid(db_pool: &Pool<Postgres>, id: i32) -> String {
 mod tests {
     use super::*;
     use crate::command::Partial;
+    use sqlx::types::chrono::{DateTime, Utc};
+
+    /// Fixed INTERNALDATE for deterministic tests: 23 Oct 2024 19:00:00 UTC.
+    fn received_at() -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339("2024-10-23T19:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc)
+    }
 
     /// A minimal RFC 5322 message: five header lines, the blank-line
     /// separator, and one line of body.
@@ -249,7 +263,7 @@ Hello, Bob.\r\n";
     const BODY: &str = "Hello, Bob.\r\n";
 
     fn sample_email() -> Email {
-        Email::from_raw(RAW.to_string())
+        Email::from_raw(received_at(), RAW.to_string())
     }
 
     fn section(section: Section) -> BodyFetchable {
@@ -273,7 +287,7 @@ Subject: hi\r\n\
 Message-ID: <m1@example.com>\r\n\
 \r\n\
 body\r\n";
-        let env = envelope(&Email::from_raw(raw.to_string()));
+        let env = envelope(&Email::from_raw(received_at(), raw.to_string()));
 
         assert!(
             env.contains("((\"Alice Example\" NIL \"alice\" \"example.com\"))"),
@@ -282,6 +296,16 @@ body\r\n";
         assert!(
             env.contains("((NIL NIL \"bob\" \"example.com\")(NIL NIL \"carol\" \"example.net\"))"),
             "to address list wrong: {env}"
+        );
+    }
+
+    /// INTERNALDATE renders as a quoted IMAP `date-time`, taken from
+    /// `received_at` and not the `Date:` header.
+    #[test]
+    fn internal_date_renders_as_quoted_imap_date_time() {
+        assert_eq!(
+            internal_date(&sample_email()),
+            "\"23-Oct-2024 19:00:00 +0000\""
         );
     }
 

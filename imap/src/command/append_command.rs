@@ -1,5 +1,7 @@
 use std::fmt;
 
+use sqlx::types::chrono::{DateTime, Utc};
+
 use crate::{
     client_command_from_impl,
     command::{ClientCommand, client_command::ClientCommandTrait},
@@ -11,7 +13,7 @@ pub struct AppendCommand {
     pub tag: String,
     pub mailbox: String,
     pub flags: Vec<String>,
-    pub date_time: Option<String>,
+    pub date_time: Option<DateTime<Utc>>,
     pub message_length: usize,
     pub message: Option<Vec<u8>>,
 }
@@ -42,7 +44,7 @@ impl ClientCommandTrait for AppendCommand {
             .unwrap_or_default();
 
         let date_time = if cursor.peek_nonspace() == Some(b'"') {
-            Some(cursor.string()?.to_string())
+            Some(parse_date_time(&cursor.string()?)?)
         } else {
             None
         };
@@ -79,6 +81,16 @@ impl ClientCommandTrait for AppendCommand {
 }
 
 client_command_from_impl!(AppendCommand, Append);
+
+/// Parse an IMAP `date-time` argument - `"[ ]d-Mon-yyyy HH:MM:SS +ZZZZ"`, quotes
+/// already stripped - into a UTC instant. This becomes the message's INTERNALDATE.
+fn parse_date_time(raw: &str) -> Result<DateTime<Utc>, CommandParseError> {
+    DateTime::parse_from_str(raw.trim(), "%d-%b-%Y %H:%M:%S %z")
+        .map(|dt| dt.with_timezone(&Utc))
+        .map_err(|e| {
+            CommandParseError::MalformedCommand(Some(format!("APPEND date-time {raw:?}: {e}")))
+        })
+}
 
 #[cfg(test)]
 mod tests {
@@ -132,8 +144,27 @@ mod tests {
     fn parses_date_time() {
         let (cmd, _) = parse(b"a1 APPEND INBOX \"23-Oct-2024 19:00:00 +0000\" {5+}\r\nhello\r\n");
 
-        assert_eq!(cmd.date_time.as_deref(), Some("23-Oct-2024 19:00:00 +0000"));
+        assert_eq!(
+            cmd.date_time.map(|d| d.to_rfc3339()),
+            Some("2024-10-23T19:00:00+00:00".to_string())
+        );
         assert!(cmd.flags.is_empty());
+    }
+
+    #[test]
+    fn date_time_offset_is_normalised_to_utc() {
+        let (cmd, _) = parse(b"a1 APPEND INBOX \"23-Oct-2024 19:00:00 -0700\" {5+}\r\nhello\r\n");
+
+        assert_eq!(
+            cmd.date_time.map(|d| d.to_rfc3339()),
+            Some("2024-10-24T02:00:00+00:00".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_date_time() {
+        let err = ClientCommand::parse_bytes(b"a1 APPEND INBOX \"not a date\" {5+}\r\nhello\r\n");
+        assert!(err.is_err(), "malformed date-time should be rejected");
     }
 
     #[test]
@@ -142,7 +173,10 @@ mod tests {
             parse(b"a1 APPEND INBOX (\\Seen) \"23-Oct-2024 19:00:00 +0000\" {5+}\r\nhello\r\n");
 
         assert_eq!(cmd.flags, vec!["\\SEEN".to_string()]);
-        assert_eq!(cmd.date_time.as_deref(), Some("23-Oct-2024 19:00:00 +0000"));
+        assert_eq!(
+            cmd.date_time.map(|d| d.to_rfc3339()),
+            Some("2024-10-23T19:00:00+00:00".to_string())
+        );
     }
 
     #[test]

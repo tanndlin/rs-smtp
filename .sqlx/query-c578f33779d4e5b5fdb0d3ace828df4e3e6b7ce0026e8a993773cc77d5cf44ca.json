@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT message_id, in_reply_to, \"from\", sender, reply_to,\n                      recipients_to, recipients_cc, recipients_bcc, flags,\n                      subject, sent_date, body_text, body_html, raw_eml\n               FROM mail WHERE id = $1",
+  "query": "SELECT message_id, in_reply_to, \"from\", sender, reply_to,\n                      recipients_to, recipients_cc, recipients_bcc, flags,\n                      subject, sent_date, body_text, body_html, raw_eml, received_at\n               FROM mail WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -156,6 +156,17 @@
             "name": "raw_eml"
           }
         }
+      },
+      {
+        "ordinal": 14,
+        "name": "received_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "received_at"
+          }
+        }
       }
     ],
     "parameters": {
@@ -177,8 +188,9 @@
       true,
       true,
       true,
+      false,
       false
     ]
   },
-  "hash": "08de81d1cd886e3f2309534f3dec2854944759e7dbe3ea73e03fe4f1b6bb9d05"
+  "hash": "c578f33779d4e5b5fdb0d3ace828df4e3e6b7ce0026e8a993773cc77d5cf44ca"
 }

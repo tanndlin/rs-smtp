@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS "mail" (
     flags TEXT[] NOT NULL DEFAULT '{}',
     subject VARCHAR(500),
     sent_date TIMESTAMPTZ,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     body_text TEXT,
     body_html TEXT,
     raw_eml TEXT NOT NULL,

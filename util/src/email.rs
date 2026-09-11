@@ -6,6 +6,7 @@ pub struct Email {
     pub message_id: Option<String>,
     pub in_reply_to: Option<String>,
     pub from: String,
+    pub received_at: DateTime<Utc>, // Internal date of when the message was received by the SMTP server
     pub sender: Option<String>,
     pub reply_to: Option<String>,
     pub recipients_to: Vec<String>,
@@ -54,22 +55,32 @@ impl Email {
     /// Build a message when the envelope recipients are known out-of-band
     /// (the SMTP ingest path supplies them from `RCPT TO`). The envelope
     /// sender comes from `MAIL FROM`.
-    pub fn new(from: String, envelope: Vec<String>, raw: String) -> Self {
-        Self::build(from, Some(envelope), raw)
+    pub fn new(
+        from: String,
+        envelope: Vec<String>,
+        received_at: DateTime<Utc>,
+        raw: String,
+    ) -> Self {
+        Self::build(from, Some(envelope), received_at, raw)
     }
 
     /// Build a message that arrived with no envelope (IMAP `APPEND`): the
     /// sender and recipients are taken entirely from the headers.
-    pub fn from_raw(raw: String) -> Self {
+    pub fn from_raw(received_at: DateTime<Utc>, raw: String) -> Self {
         let from = header(&raw, "From").unwrap_or_default().to_string();
-        Self::build(from, None, raw)
+        Self::build(from, None, received_at, raw)
     }
 
     /// `envelope` is the `RCPT TO` list when known (SMTP), or `None` when the
     /// message arrived header-only (IMAP `APPEND`). `To:` / `Cc:` always come
     /// from the headers; BCC recipients are the envelope entries not openly
     /// addressed there, or - with no envelope - an explicit `Bcc:` header.
-    pub fn build(from: String, envelope: Option<Vec<String>>, raw: String) -> Self {
+    pub fn build(
+        from: String,
+        envelope: Option<Vec<String>>,
+        received_at: DateTime<Utc>,
+        raw: String,
+    ) -> Self {
         let recipients_to = address_list(&raw, "To");
         let recipients_cc = address_list(&raw, "Cc");
 
@@ -103,6 +114,7 @@ impl Email {
             message_id,
             in_reply_to,
             from,
+            received_at,
             sender,
             reply_to,
             recipients_to,
@@ -126,6 +138,7 @@ impl Email {
             message_id,
             in_reply_to,
             from,
+            received_at,
             sender,
             reply_to,
             recipients_to,
@@ -143,10 +156,10 @@ impl Email {
             r#"INSERT INTO mail
                  (mailbox_id, uid, message_id, in_reply_to, "from", sender, reply_to,
                   recipients_to, recipients_cc, recipients_bcc, flags,
-                  subject, sent_date, body_text, body_html, raw_eml)
+                  subject, sent_date, body_text, body_html, raw_eml, received_at)
                VALUES
                  ((SELECT id FROM mailboxes WHERE name = $1),
-                  $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)"#,
+                  $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)"#,
             mailbox,
             uid,
             message_id,
@@ -163,6 +176,7 @@ impl Email {
             body_text,
             body_html,
             raw_eml,
+            received_at
         )
         .execute(executor)
         .await
@@ -178,7 +192,7 @@ impl Email {
             Email,
             r#"SELECT message_id, in_reply_to, "from", sender, reply_to,
                       recipients_to, recipients_cc, recipients_bcc, flags,
-                      subject, sent_date, body_text, body_html, raw_eml
+                      subject, sent_date, body_text, body_html, raw_eml, received_at
                FROM mail WHERE id = $1"#,
             id,
         )

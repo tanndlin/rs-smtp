@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use sqlx::{Pool, Postgres};
+use sqlx::{Pool, Postgres, types::chrono::Utc};
 
 use crate::{
     command::{
@@ -313,7 +313,10 @@ impl IMAPSession {
     /// Persist an appended message and allocate it a UID in `cmd.mailbox`.
     /// Returns `(uid_validity, uid)` for the `APPENDUID` response code.
     async fn store_appended_message(&self, cmd: &AppendCommand, message: &[u8]) -> (u32, u32) {
-        let email = Email::from_raw(String::from_utf8_lossy(message).into_owned());
+        let email = Email::from_raw(
+            cmd.date_time.unwrap_or_else(Utc::now),
+            String::from_utf8_lossy(message).into_owned(),
+        );
 
         let mut tx = self
             .db_pool

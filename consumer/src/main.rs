@@ -1,6 +1,6 @@
 use futures_lite::stream::StreamExt;
 use lapin::{Connection, ConnectionProperties, options::*, types::FieldTable};
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{postgres::PgPoolOptions, types::chrono};
 
 use util::Email;
 
@@ -74,9 +74,19 @@ async fn main() {
             .split(";")
             .map(|s| s.to_string())
             .collect();
+        let received_at = headers
+            .inner()
+            .get("received_at")
+            .unwrap()
+            .as_long_string()
+            .unwrap()
+            .to_string();
+        let received_at = chrono::DateTime::parse_from_str(&received_at, "%d-%b-%Y %H:%M:%S %z")
+            .expect("Failed to parse received_at")
+            .with_timezone(&chrono::Utc);
 
         let body = String::from_utf8_lossy(&delivery.data).into_owned();
-        let email = Email::new(from, recipients, body);
+        let email = Email::new(from, recipients, received_at, body);
 
         println!("Received message");
         println!("From: {}", email.from);
