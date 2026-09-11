@@ -38,84 +38,81 @@ pub async fn get_fetchable(
 }
 
 fn handle_body(email: Email, b: &BodyFetchable) -> String {
-    match b {
-        BodyFetchable::Full => {
-            let body = body_octets(&email.raw_eml);
-            format!(
-                "BODY (\"TEXT\" \"PLAIN\" (\"CHARSET\" \"US-ASCII\") NIL NIL \"7BIT\" {} {})",
-                body.len(),
-                body.matches("\r\n").count()
-            )
-        }
+    let (section, partial) = match b {
+        BodyFetchable::Full => return body_structure(&email),
         BodyFetchable::Section {
-            peek: _,
-            section,
-            partial,
-        } => match section {
-            Section::Full => match partial {
-                None => format!("BODY[] {{{}}}\r\n{}", email.raw_eml.len(), email.raw_eml),
-                Some(Partial { start, count }) => {
-                    let raw = &email.raw_eml;
-                    let start = (*start as usize).min(raw.len());
-                    let end = start.saturating_add(*count as usize).min(raw.len());
-                    let slice = &raw[start..end];
-                    format!("BODY[]<{start}> {{{}}}\r\n{slice}", slice.len())
-                }
-            },
-            Section::Msg(section_text) => match section_text {
-                SectionText::Header => {
-                    let headers = email.get_headers();
-                    let len = headers.len();
-                    format!("BODY[HEADER] {{{len}}}\r\n{headers}")
-                }
-                // TODO: This is ugly and O(nm)
-                SectionText::HeaderFields(items) => {
-                    let headers = email
-                        .get_headers()
-                        .split("\r\n")
-                        .filter(|h| items.iter().any(|i| h.to_uppercase().starts_with(i)))
-                        .collect::<Vec<_>>()
-                        .join("\r\n");
-                    let len = headers.len();
-                    format!(
-                        "BODY[HEADER.FIELDS ({})] {{{len}}}\r\n{headers}",
-                        items.join(" ")
-                    )
-                }
-                SectionText::HeaderFieldsNot(items) => {
-                    let headers = email
-                        .get_headers()
-                        .split("\r\n")
-                        .filter(|h| !items.iter().any(|i| h.to_uppercase().starts_with(i)))
-                        .collect::<Vec<_>>()
-                        .join("\r\n");
-                    let len = headers.len();
-                    format!(
-                        "BODY[HEADER.FIELDS.NOT ({})] {{{len}}}\r\n{headers}",
-                        items.join(" ")
-                    )
-                }
-                SectionText::Text => {
-                    let body = body_octets(&email.raw_eml);
-                    format!("BODY[TEXT] {{{}}}\r\n{body}", body.len())
-                }
-                SectionText::Mime => todo!(),
-            },
-            Section::Part { part, text } => match (part.as_slice(), text) {
-                ([1], None) => {
-                    let body = body_octets(&email.raw_eml);
-                    format!("BODY[1] {{{}}}\r\n{body}", body.len())
-                }
-                _ => todo!(),
-            },
-        },
+            section, partial, ..
+        } => (section, partial),
+    };
+
+    let (key, data) = match section {
+        Section::Full => (String::new(), email.raw_eml.clone()),
+        Section::Msg(text) => msg_section(&email, text),
+        Section::Part { part, text } => part_section(&email, part, text),
+    };
+
+    literal(&key, &data, partial)
+}
+
+/// Format a `BODY[<key>]` literal response item, applying `<start.count>`
+/// truncation when a partial was requested.
+fn literal(key: &str, data: &str, partial: &Option<Partial>) -> String {
+    match partial {
+        None => format!("BODY[{key}] {{{}}}\r\n{data}", data.len()),
+        Some(Partial { start, count }) => {
+            let start = (*start as usize).min(data.len());
+            let end = start.saturating_add(*count as usize).min(data.len());
+            let slice = &data[start..end];
+            format!("BODY[{key}]<{start}> {{{}}}\r\n{slice}", slice.len())
+        }
     }
 }
 
+fn msg_section(email: &Email, text: &SectionText) -> (String, String) {
+    match text {
+        SectionText::Header => ("HEADER".into(), email.get_headers()),
+        SectionText::HeaderFields(names) => (
+            format!("HEADER.FIELDS ({})", names.join(" ")),
+            select_headers(email, names, true),
+        ),
+        SectionText::HeaderFieldsNot(names) => (
+            format!("HEADER.FIELDS.NOT ({})", names.join(" ")),
+            select_headers(email, names, false),
+        ),
+        SectionText::Text => ("TEXT".into(), body_octets(&email.raw_eml).to_string()),
+        SectionText::Mime => todo!(),
+    }
+}
+
+fn part_section(email: &Email, part: &[u32], text: &Option<SectionText>) -> (String, String) {
+    match (part, text) {
+        ([1], None) => ("1".into(), body_octets(&email.raw_eml).to_string()),
+        _ => todo!(),
+    }
+}
+
+/// The header lines whose field name matches one of `names` (`keep`) or none
+/// of them (`!keep`), rejoined with CRLF.
+fn select_headers(email: &Email, names: &[String], keep: bool) -> String {
+    email
+        .get_headers()
+        .split("\r\n")
+        .filter(|line| names.iter().any(|n| line.to_uppercase().starts_with(n)) == keep)
+        .collect::<Vec<_>>()
+        .join("\r\n")
+}
+
+fn body_structure(email: &Email) -> String {
+    let body = body_octets(&email.raw_eml);
+    format!(
+        "BODY (\"TEXT\" \"PLAIN\" (\"CHARSET\" \"US-ASCII\") NIL NIL \"7BIT\" {} {})",
+        body.len(),
+        body.matches("\r\n").count()
+    )
+}
+
 fn body_octets(raw: &str) -> &str {
-    raw.split_once("\r\n\r\n")
-        .map(|(_, body)| body)
-        .unwrap_or("")
+    raw.split_once("\r\n\r\n").map(|(_, body)| body).unwrap_or("")
 }
 
 fn envelope(email: &Email) -> String {
