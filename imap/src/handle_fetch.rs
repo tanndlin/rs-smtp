@@ -112,7 +112,9 @@ fn body_structure(email: &Email) -> String {
 }
 
 fn body_octets(raw: &str) -> &str {
-    raw.split_once("\r\n\r\n").map(|(_, body)| body).unwrap_or("")
+    raw.split_once("\r\n\r\n")
+        .map(|(_, body)| body)
+        .unwrap_or("")
 }
 
 /// The message's INTERNALDATE as an IMAP `date-time` quoted string, e.g.
