@@ -278,6 +278,12 @@ impl IMAPSession {
                         Fetchable::Internaldate,
                         Fetchable::RFC822Size,
                     ],
+                    Fetchable::All => &[
+                        Fetchable::Flags,
+                        Fetchable::Internaldate,
+                        Fetchable::RFC822Size,
+                        Fetchable::Envelope,
+                    ],
                     Fetchable::Full => &[
                         Fetchable::Flags,
                         Fetchable::Internaldate,

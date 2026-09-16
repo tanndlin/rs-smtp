@@ -25,7 +25,7 @@ pub async fn get_fetchable(
     match fetchable {
         Fetchable::Envelope => envelope(&email),
         Fetchable::RFC822Size => email.raw_eml.len().to_string(),
-        Fetchable::All => todo!(),
+        Fetchable::All => unreachable!("expanded before reaching get_fetchable"),
         Fetchable::Fast => unreachable!("expanded before reaching get_fetchable"),
         Fetchable::Full => unreachable!("expanded before reaching get_fetchable"),
         Fetchable::Binary(_) => todo!(),
