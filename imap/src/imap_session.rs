@@ -4,8 +4,8 @@ use sqlx::{Pool, Postgres, types::chrono::Utc};
 
 use crate::{
     command::{
-        AppendCommand, ClientCommand, ClientCommandTrait, FetchCommand, Fetchable, ListCommand,
-        LogoutCommand, SelectCommand, Sequence, StatusCommand,
+        AppendCommand, BodyFetchable, ClientCommand, ClientCommandTrait, FetchCommand, Fetchable,
+        ListCommand, LogoutCommand, SelectCommand, Sequence, StatusCommand,
     },
     cursor::Cursor,
     handle_fetch::get_fetchable,
@@ -277,6 +277,13 @@ impl IMAPSession {
                         Fetchable::Flags,
                         Fetchable::Internaldate,
                         Fetchable::RFC822Size,
+                    ],
+                    Fetchable::Full => &[
+                        Fetchable::Flags,
+                        Fetchable::Internaldate,
+                        Fetchable::RFC822Size,
+                        Fetchable::Envelope,
+                        Fetchable::Body(BodyFetchable::Full),
                     ],
                     other => std::slice::from_ref(other),
                 };
