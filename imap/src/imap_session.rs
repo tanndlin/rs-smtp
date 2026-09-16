@@ -4,8 +4,8 @@ use sqlx::{Pool, Postgres, types::chrono::Utc};
 
 use crate::{
     command::{
-        AppendCommand, ClientCommand, ClientCommandTrait, FetchCommand, ListCommand, LogoutCommand,
-        SelectCommand, Sequence, StatusCommand,
+        AppendCommand, ClientCommand, ClientCommandTrait, FetchCommand, Fetchable, ListCommand,
+        LogoutCommand, SelectCommand, Sequence, StatusCommand,
     },
     cursor::Cursor,
     handle_fetch::get_fetchable,
@@ -272,8 +272,19 @@ impl IMAPSession {
         for message_id in Sequence::to_message_ids(&cmd.sequences, last) {
             let mut metadata: HashMap<String, String> = HashMap::new();
             for fetchable in &cmd.fetch_list {
-                let value = get_fetchable(self.db_pool.clone(), message_id, fetchable).await;
-                metadata.insert(fetchable.to_string(), value);
+                let expanded: &[Fetchable] = match fetchable {
+                    Fetchable::Fast => &[
+                        Fetchable::Flags,
+                        Fetchable::Internaldate,
+                        Fetchable::RFC822Size,
+                    ],
+                    other => std::slice::from_ref(other),
+                };
+
+                for fetchable in expanded {
+                    let value = get_fetchable(self.db_pool.clone(), message_id, fetchable).await;
+                    metadata.insert(fetchable.to_string(), value);
+                }
             }
 
             responses.push(FetchMessageResponse::new(message_id, metadata));
