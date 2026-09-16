@@ -84,48 +84,40 @@ fn handle_body(email: Email, b: &BodyFetchable) -> String {
         } => (section, partial),
     };
 
-    let (key, data) = match section {
-        Section::Full => (String::new(), email.raw_eml.clone()),
+    let data = match section {
+        Section::Full => email.raw_eml.clone(),
         Section::Msg(text) => msg_section(&email, text),
         Section::Part { part, text } => part_section(&email, part, text),
     };
 
-    literal(&key, &data, partial)
+    literal(&data, partial)
 }
 
-/// Format a `BODY[<key>]` literal response item, applying `<start.count>`
-/// truncation when a partial was requested.
-fn literal(key: &str, data: &str, partial: &Option<Partial>) -> String {
-    match partial {
-        None => format!("BODY[{key}] {{{}}}\r\n{data}", data.len()),
+fn literal(data: &str, partial: &Option<Partial>) -> String {
+    let data = match partial {
+        None => data,
         Some(Partial { start, count }) => {
             let start = (*start as usize).min(data.len());
             let end = start.saturating_add(*count as usize).min(data.len());
-            let slice = &data[start..end];
-            format!("BODY[{key}]<{start}> {{{}}}\r\n{slice}", slice.len())
+            &data[start..end]
         }
-    }
+    };
+    format!("{{{}}}\r\n{data}", data.len())
 }
 
-fn msg_section(email: &Email, text: &SectionText) -> (String, String) {
+fn msg_section(email: &Email, text: &SectionText) -> String {
     match text {
-        SectionText::Header => ("HEADER".into(), email.get_headers()),
-        SectionText::HeaderFields(names) => (
-            format!("HEADER.FIELDS ({})", names.join(" ")),
-            select_headers(email, names, true),
-        ),
-        SectionText::HeaderFieldsNot(names) => (
-            format!("HEADER.FIELDS.NOT ({})", names.join(" ")),
-            select_headers(email, names, false),
-        ),
-        SectionText::Text => ("TEXT".into(), body_octets(&email.raw_eml).to_string()),
+        SectionText::Header => email.get_headers(),
+        SectionText::HeaderFields(names) => select_headers(email, names, true),
+        SectionText::HeaderFieldsNot(names) => select_headers(email, names, false),
+        SectionText::Text => body_octets(&email.raw_eml).to_string(),
         SectionText::Mime => todo!(),
     }
 }
 
-fn part_section(email: &Email, part: &[u32], text: &Option<SectionText>) -> (String, String) {
+fn part_section(email: &Email, part: &[u32], text: &Option<SectionText>) -> String {
     match (part, text) {
-        ([1], None) => ("1".into(), body_octets(&email.raw_eml).to_string()),
+        ([1], None) => body_octets(&email.raw_eml).to_string(),
         _ => todo!(),
     }
 }
@@ -144,7 +136,7 @@ fn select_headers(email: &Email, names: &[String], keep: bool) -> String {
 fn body_structure(email: &Email) -> String {
     let body = body_octets(&email.raw_eml);
     format!(
-        "BODY (\"TEXT\" \"PLAIN\" (\"CHARSET\" \"US-ASCII\") NIL NIL \"7BIT\" {} {})",
+        "(\"TEXT\" \"PLAIN\" (\"CHARSET\" \"US-ASCII\") NIL NIL \"7BIT\" {} {})",
         body.len(),
         body.matches("\r\n").count()
     )
@@ -356,15 +348,12 @@ body\r\n";
     // answers with `todo!()`. They pin the RFC 9051 §7.5.2 response item and
     // are expected to fail until each arm is implemented.
 
-    /// RED: `BODY[TEXT]` returns only the body, keyed `BODY[TEXT]`.
     #[test]
     fn body_text_returns_body_only() {
         let out = handle_body(sample_email(), &section(Section::Msg(SectionText::Text)));
-        assert_eq!(out, format!("BODY[TEXT] {{{}}}\r\n{BODY}", BODY.len()));
+        assert_eq!(out, format!("{{{}}}\r\n{BODY}", BODY.len()));
     }
 
-    /// RED: `BODY[HEADER.FIELDS (SUBJECT)]` returns just the named header
-    /// line(s) plus the terminating CRLF, and nothing else.
     #[test]
     fn body_header_fields_returns_named_headers_only() {
         let out = handle_body(
@@ -372,10 +361,6 @@ body\r\n";
             &section(Section::Msg(SectionText::HeaderFields(vec![
                 "SUBJECT".into(),
             ]))),
-        );
-        assert!(
-            out.starts_with("BODY[HEADER.FIELDS (SUBJECT)] {"),
-            "wrong response item key: {out:?}"
         );
         assert!(
             out.contains("Subject: greetings"),
@@ -396,10 +381,6 @@ body\r\n";
             ]))),
         );
         assert!(
-            out.starts_with("BODY[HEADER.FIELDS.NOT (SUBJECT)] {"),
-            "wrong response item key: {out:?}"
-        );
-        assert!(
             out.contains("From: alice@example.com"),
             "missing an un-excluded header: {out:?}"
         );
@@ -409,7 +390,6 @@ body\r\n";
         );
     }
 
-    /// RED: for a non-multipart message, `BODY[1]` is the message body.
     #[test]
     fn body_numbered_part_returns_part_payload() {
         let out = handle_body(
@@ -419,22 +399,18 @@ body\r\n";
                 text: None,
             }),
         );
-        assert_eq!(out, format!("BODY[1] {{{}}}\r\n{BODY}", BODY.len()));
+        assert_eq!(out, format!("{{{}}}\r\n{BODY}", BODY.len()));
     }
 
-    /// RED: bare `BODY` renders the non-extensible BODYSTRUCTURE, a
-    /// parenthesised structure keyed simply `BODY`.
     #[test]
     fn bare_body_renders_body_structure() {
         let out = handle_body(sample_email(), &BodyFetchable::Full);
         assert!(
-            out.starts_with("BODY (") || out.starts_with("BODY("),
+            out.starts_with('('),
             "expected a parenthesised body structure: {out:?}"
         );
     }
 
-    /// RED: `BODY[]<0.5>` returns only the first five octets and the response
-    /// item carries the origin offset: `BODY[]<0> {5}`.
     #[test]
     fn body_full_with_partial_truncates_to_range() {
         let out = handle_body(
@@ -445,6 +421,6 @@ body\r\n";
                 partial: Some(Partial { start: 0, count: 5 }),
             },
         );
-        assert_eq!(out, format!("BODY[]<0> {{5}}\r\n{}", &RAW[..5]));
+        assert_eq!(out, format!("{{5}}\r\n{}", &RAW[..5]));
     }
 }

@@ -252,8 +252,6 @@ async fn fetch_full_body_returns_raw_eml() {
     );
 }
 
-/// `FETCH 1 (UID RFC822.SIZE)` - a parenthesised att list returns both items
-/// on a single untagged line. Ordering inside the parens is not asserted.
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_uid_and_size_together() {
     let addr = start_server().await;
@@ -281,8 +279,6 @@ async fn fetch_uid_and_size_together() {
     );
 }
 
-/// RED: `BODY[TEXT]` should return the body only, as a `BODY[TEXT]` literal.
-/// `handle_body` still has `todo!()` for `SectionText::Text`.
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_body_text_returns_body_only() {
     let addr = start_server().await;
@@ -309,8 +305,6 @@ async fn fetch_body_text_returns_body_only() {
     );
 }
 
-/// RED: `BODY[HEADER.FIELDS (SUBJECT)]` should return just the named header.
-/// `handle_body` still has `todo!()` for `SectionText::HeaderFields`.
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_body_header_fields_returns_subset() {
     let addr = start_server().await;
@@ -339,8 +333,6 @@ async fn fetch_body_header_fields_returns_subset() {
     );
 }
 
-/// RED: `BODY[1]` on a non-multipart message is the message body.
-/// `handle_body` still has `todo!()` for `Section::Part`.
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_numbered_body_part_returns_part() {
     let addr = start_server().await;
@@ -363,9 +355,6 @@ async fn fetch_numbered_body_part_returns_part() {
     );
 }
 
-/// RED: a partial `BODY[]<0.10>` returns only the first ten octets, and the
-/// response item names the origin octet: `BODY[]<0> {10}`. `handle_body`
-/// ignores the partial range today and returns the whole message.
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_body_partial_returns_truncated_octets() {
     let addr = start_server().await;
@@ -388,8 +377,6 @@ async fn fetch_body_partial_returns_truncated_octets() {
     );
 }
 
-/// RED: bare `FETCH 1 BODY` returns the non-extensible BODYSTRUCTURE.
-/// `handle_body` still has `todo!()` for `BodyFetchable::Full`.
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_bare_body_returns_body_structure() {
     let addr = start_server().await;
@@ -408,7 +395,6 @@ async fn fetch_bare_body_returns_body_structure() {
     );
 }
 
-/// RED: `FETCH 1 BODYSTRUCTURE` is unimplemented (`todo!()` in `get_fetchable`).
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_bodystructure_returns_structure() {
     let addr = start_server().await;
@@ -427,7 +413,6 @@ async fn fetch_bodystructure_returns_structure() {
     );
 }
 
-/// RED: `FETCH 1 INTERNALDATE` is unimplemented (`todo!()` in `get_fetchable`).
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_internaldate_returns_quoted_date() {
     let addr = start_server().await;
@@ -446,9 +431,6 @@ async fn fetch_internaldate_returns_quoted_date() {
     );
 }
 
-/// RED: the `FETCH 1 ALL` macro expands to
-/// `(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)`. `get_fetchable` has `todo!()`
-/// for `Fetchable::All`.
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_all_macro_expands_to_four_items() {
     let addr = start_server().await;
@@ -469,9 +451,6 @@ async fn fetch_all_macro_expands_to_four_items() {
     );
 }
 
-/// RED: `FETCH 1 UID` on a message that is not sequence 1 must still address
-/// it. Here UID 1 == seq 1, so this passes; kept as a guard for the
-/// out-of-range case below.
 #[tokio::test(flavor = "multi_thread")]
 async fn fetch_out_of_range_sequence_returns_no_untagged() {
     let addr = start_server().await;

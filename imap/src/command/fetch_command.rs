@@ -231,7 +231,7 @@ impl fmt::Display for BodyFetchable {
             } => {
                 write!(f, "BODY[{section}]")?;
                 if let Some(partial) = partial {
-                    write!(f, "{partial}")?;
+                    write!(f, "<{}>", partial.start)?;
                 }
                 Ok(())
             }
