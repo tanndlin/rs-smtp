@@ -78,7 +78,7 @@ fn handle_bodystructure(email: &Email) -> String {
 
 fn handle_body(email: Email, b: &BodyFetchable) -> String {
     let (section, partial) = match b {
-        BodyFetchable::Full => return body_structure(&email),
+        BodyFetchable::Full => return handle_bodystructure(&email),
         BodyFetchable::Section {
             section, partial, ..
         } => (section, partial),
@@ -131,15 +131,6 @@ fn select_headers(email: &Email, names: &[String], keep: bool) -> String {
         .filter(|line| names.iter().any(|n| line.to_uppercase().starts_with(n)) == keep)
         .collect::<Vec<_>>()
         .join("\r\n")
-}
-
-fn body_structure(email: &Email) -> String {
-    let body = body_octets(&email.raw_eml);
-    format!(
-        "(\"TEXT\" \"PLAIN\" (\"CHARSET\" \"US-ASCII\") NIL NIL \"7BIT\" {} {})",
-        body.len(),
-        body.matches("\r\n").count()
-    )
 }
 
 fn body_octets(raw: &str) -> &str {
