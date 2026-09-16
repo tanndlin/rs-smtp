@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use sqlx::{Pool, Postgres};
-use util::Email;
+use util::{BodyStructure, Email};
 
 use crate::command::{BodyFetchable, Fetchable, Partial, Section, SectionText};
 
@@ -30,11 +30,50 @@ pub async fn get_fetchable(
         Fetchable::Full => todo!(),
         Fetchable::Binary(_) => todo!(),
         Fetchable::Body(b) => handle_body(email, b),
-        Fetchable::BodyStructure => todo!(),
+        Fetchable::BodyStructure => handle_bodystructure(&email),
         Fetchable::Flags => format!("({})", email.flags.join(" ")),
         Fetchable::Internaldate => internal_date(&email),
         Fetchable::UID => unreachable!("handled above"),
     }
+}
+
+fn handle_bodystructure(email: &Email) -> String {
+    let BodyStructure {
+        content_type,
+        content_subtype,
+        body_parameters,
+        content_id,
+        content_description,
+        content_transfer_encoding,
+        size,
+        lines,
+    } = BodyStructure::from(email);
+
+    let content_id = content_id
+        .map(|id| format!("\"{}\"", id))
+        .unwrap_or_else(|| "NIL".to_string());
+    let content_description = content_description
+        .map(|desc| format!("\"{}\"", desc))
+        .unwrap_or_else(|| "NIL".to_string());
+    let content_transfer_encoding = content_transfer_encoding
+        .map(|enc| format!("\"{}\"", enc))
+        .unwrap_or_else(|| "NIL".to_string());
+
+    format!(
+        "(\"{}\" \"{}\" ({}) {} {} {} {} {})",
+        content_type,
+        content_subtype,
+        body_parameters
+            .into_iter()
+            .map(|(k, v)| format!("(\"{}\" \"{}\")", k, v))
+            .collect::<Vec<_>>()
+            .join(" "),
+        content_id,
+        content_description,
+        content_transfer_encoding,
+        size,
+        lines
+    )
 }
 
 fn handle_body(email: Email, b: &BodyFetchable) -> String {

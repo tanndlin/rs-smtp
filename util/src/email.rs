@@ -25,7 +25,13 @@ fn header<'a>(raw: &'a str, name: &str) -> Option<&'a str> {
     raw.split("\r\n")
         .take_while(|l| !l.is_empty())
         .find(|l| l.to_ascii_lowercase().starts_with(&prefix))
-        .map(|l| l[prefix.len()..].trim())
+        .map(|line| line[prefix.len()..].trim())
+}
+
+impl Email {
+    pub fn header<'a>(&'a self, name: &str) -> Option<&'a str> {
+        header(&self.raw_eml, name)
+    }
 }
 
 fn address_list(raw: &str, name: &str) -> Vec<String> {
