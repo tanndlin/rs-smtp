@@ -126,9 +126,10 @@ impl IMAPSession {
                 ClientCommand::Fetch(cmd) => self.handle_fetch_command(cmd).await,
                 ClientCommand::Append(cmd) => self.handle_append_command(cmd).await,
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
-                ClientCommand::Capability(_)
-                | ClientCommand::StartTLS(_)
-                | ClientCommand::Login(_) => todo!("This should return an error"),
+                ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
+                ClientCommand::StartTLS(_) | ClientCommand::Login(_) => {
+                    todo!("This should return an error")
+                }
             },
             SessionState::Logout => panic!("Received command after LOGOUT"),
         }
