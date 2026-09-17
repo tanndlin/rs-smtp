@@ -13,7 +13,7 @@ pub struct CreateCommand {
 
 impl ClientCommandTrait for CreateCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        let mailbox = cursor.atom()?.to_string();
+        let mailbox = cursor.string()?.to_string();
         Ok(CreateCommand { tag, mailbox })
     }
 
