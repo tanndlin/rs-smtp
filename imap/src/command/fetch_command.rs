@@ -57,6 +57,34 @@ impl Sequence {
         ids.dedup();
         ids
     }
+
+    pub fn parse_bytes(cursor: &mut Cursor<'_>) -> Result<Self, CommandParseError> {
+        let start = cursor.sequence_indicator()?;
+        if let Some(next) = cursor.peek_nonspace()
+            && next == b':'
+        {
+            cursor.eat(b':').unwrap();
+            let end = cursor.sequence_indicator()?;
+            Ok(Self::Range { start, end })
+        } else {
+            Ok(Self::Single(start))
+        }
+    }
+
+    /// `sequence-set = (seq-number / seq-range) *("," sequence-set)`
+    pub fn parse_set(cursor: &mut Cursor<'_>) -> Result<Vec<Self>, CommandParseError> {
+        let mut sequences = vec![];
+        loop {
+            sequences.push(Self::parse_bytes(cursor)?);
+            if cursor.peek_nonspace() != Some(b',') {
+                break;
+            }
+
+            cursor.eat(b',')?;
+        }
+
+        Ok(sequences)
+    }
 }
 
 #[derive(Debug)]
@@ -522,30 +550,7 @@ impl FromStr for Partial {
 
 impl ClientCommandTrait for FetchCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        let sequences = {
-            let mut sequences = vec![];
-            loop {
-                let start = cursor.sequence_indicator()?;
-                if let Some(next) = cursor.peek_nonspace()
-                    && next == b':'
-                {
-                    cursor.eat(b':').unwrap();
-                    let end = cursor.sequence_indicator()?;
-                    sequences.push(Sequence::Range { start, end })
-                } else {
-                    sequences.push(Sequence::Single(start))
-                }
-
-                if let Some(next) = cursor.peek_nonspace()
-                    && next != b','
-                {
-                    break;
-                }
-                cursor.eat(b',').unwrap();
-            }
-
-            sequences
-        };
+        let sequences = Sequence::parse_set(cursor)?;
 
         // A FETCH takes either a parenthesized list of items, or a single
         // bare item with no parens (e.g. `FETCH 1 BODY`).

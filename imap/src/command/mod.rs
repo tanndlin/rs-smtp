@@ -9,6 +9,7 @@ mod lsub_command;
 mod select_command;
 mod start_tls_command;
 mod status_command;
+mod uid_command;
 
 pub use append_command::AppendCommand;
 pub use capability_command::CapabilityCommand;
@@ -24,3 +25,4 @@ pub use lsub_command::LsubCommand;
 pub use select_command::SelectCommand;
 pub use start_tls_command::StartTLSCommand;
 pub use status_command::StatusCommand;
+pub use uid_command::{Store, StoreOperation, UIDCommand, UIDCommandType};

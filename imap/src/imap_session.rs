@@ -6,6 +6,7 @@ use crate::{
     command::{
         AppendCommand, BodyFetchable, ClientCommand, ClientCommandTrait, FetchCommand, Fetchable,
         ListCommand, LogoutCommand, LsubCommand, SelectCommand, Sequence, StatusCommand,
+        UIDCommand, UIDCommandType,
     },
     cursor::Cursor,
     handle_fetch::get_fetchable,
@@ -121,6 +122,9 @@ impl IMAPSession {
                 ClientCommand::Append(cmd) => {
                     cmd.protocol_violation("Not authorized".to_string()).into()
                 }
+                ClientCommand::UID(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
             },
             SessionState::Authenticated => match command {
                 ClientCommand::List(cmd) => self.handle_list_command(cmd),
@@ -131,6 +135,7 @@ impl IMAPSession {
                 ClientCommand::Append(cmd) => self.handle_append_command(cmd).await,
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
                 ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
+                ClientCommand::UID(cmd) => self.handle_uid(cmd).await,
                 ClientCommand::StartTLS(_) | ClientCommand::Login(_) => {
                     todo!("This should return an error")
                 }
@@ -383,5 +388,27 @@ impl IMAPSession {
             .expect("failed to commit appended message");
 
         (allocated.uid_validity as u32, allocated.uid as u32)
+    }
+
+    async fn handle_uid(&self, cmd: UIDCommand) -> ServerResponse {
+        match cmd.command {
+            UIDCommandType::Fetch {
+                sequences,
+                fetchable,
+            } => {
+                let fetch_cmd = FetchCommand {
+                    tag: cmd.tag,
+                    sequences,
+                    fetch_list: fetchable,
+                };
+                self.handle_fetch_command(fetch_cmd).await
+            }
+            UIDCommandType::Store { sequences, store } => {
+                todo!();
+            }
+            UIDCommandType::Copy { sequences, mailbox } => {
+                todo!();
+            }
+        }
     }
 }
