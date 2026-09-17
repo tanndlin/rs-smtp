@@ -1,7 +1,7 @@
 use crate::{
     command::{
         AppendCommand, CapabilityCommand, FetchCommand, ListCommand, LoginCommand, LogoutCommand,
-        SelectCommand, StartTLSCommand, StatusCommand,
+        LsubCommand, SelectCommand, StartTLSCommand, StatusCommand,
     },
     cursor::Cursor,
     errors::CommandParseError,
@@ -14,6 +14,7 @@ pub enum ClientCommand {
     StartTLS(StartTLSCommand),
     Login(LoginCommand),
     List(ListCommand),
+    Lsub(LsubCommand),
     Select(SelectCommand),
     Status(StatusCommand),
     Fetch(FetchCommand),
@@ -32,6 +33,7 @@ impl ClientCommand {
             "STARTTLS" => StartTLSCommand::parse_bytes(tag, &mut cursor)?.into(),
             "LOGIN" => LoginCommand::parse_bytes(tag, &mut cursor)?.into(),
             "LIST" => ListCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "LSUB" => LsubCommand::parse_bytes(tag, &mut cursor)?.into(),
             "SELECT" => SelectCommand::parse_bytes(tag, &mut cursor)?.into(),
             "STATUS" => StatusCommand::parse_bytes(tag, &mut cursor)?.into(),
             "FETCH" => FetchCommand::parse_bytes(tag, &mut cursor)?.into(),

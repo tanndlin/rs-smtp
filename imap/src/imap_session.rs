@@ -5,15 +5,15 @@ use sqlx::{Pool, Postgres, types::chrono::Utc};
 use crate::{
     command::{
         AppendCommand, BodyFetchable, ClientCommand, ClientCommandTrait, FetchCommand, Fetchable,
-        ListCommand, LogoutCommand, SelectCommand, Sequence, StatusCommand,
+        ListCommand, LogoutCommand, LsubCommand, SelectCommand, Sequence, StatusCommand,
     },
     cursor::Cursor,
     handle_fetch::get_fetchable,
     response::{
         AppendOkResponse, CapabilityResponse, ContinuationResponse, FetchMessageResponse,
         FetchResponse, Greeting, ListResponse, LoginResponse, LoginResult, LogoutResponse,
-        MailboxListEntry, SelectResponse, ServerErrorReason, ServerErrorResponse, ServerResponse,
-        ServerResponseTrait, StatusResponse,
+        LsubResponse, MailboxListEntry, SelectResponse, ServerErrorReason, ServerErrorResponse,
+        ServerResponse, ServerResponseTrait, StatusResponse,
     },
 };
 use util::Email;
@@ -106,6 +106,9 @@ impl IMAPSession {
                 ClientCommand::List(cmd) => {
                     cmd.protocol_violation("Not authorized".to_string()).into()
                 }
+                ClientCommand::Lsub(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
                 ClientCommand::Select(cmd) => {
                     cmd.protocol_violation("Not authorized".to_string()).into()
                 }
@@ -121,6 +124,7 @@ impl IMAPSession {
             },
             SessionState::Authenticated => match command {
                 ClientCommand::List(cmd) => self.handle_list_command(cmd),
+                ClientCommand::Lsub(cmd) => self.handle_lsub_command(cmd),
                 ClientCommand::Select(cmd) => self.handle_select_command(cmd).await,
                 ClientCommand::Status(cmd) => self.handle_status_command(cmd).await,
                 ClientCommand::Fetch(cmd) => self.handle_fetch_command(cmd).await,
@@ -148,6 +152,17 @@ impl IMAPSession {
         );
         let mailboxes: Vec<MailboxListEntry> = vec![inbox];
         ListResponse::new(cmd.tag, mailboxes).into()
+    }
+
+    fn handle_lsub_command(&mut self, cmd: LsubCommand) -> ServerResponse {
+        // TODO
+        let inbox = MailboxListEntry::new(
+            vec!["\\Unmarked", "\\HasNoChildren"],
+            None,
+            "Inbox".to_string(),
+        );
+        let mailboxes: Vec<MailboxListEntry> = vec![inbox];
+        LsubResponse::new(cmd.tag, mailboxes).into()
     }
 
     async fn handle_select_command(&mut self, cmd: SelectCommand) -> ServerResponse {

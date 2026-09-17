@@ -19,9 +19,9 @@ impl ListResponse {
 
 #[derive(Debug)]
 pub struct MailboxListEntry {
-    attributes: Vec<&'static str>, // e.g. ["\\Unmarked", "\\HasNoChildren"]
-    delimiter: Option<char>,
-    name: String,
+    pub attributes: Vec<&'static str>, // e.g. ["\\Unmarked", "\\HasNoChildren"]
+    pub delimiter: Option<char>,
+    pub name: String,
 }
 
 impl MailboxListEntry {
