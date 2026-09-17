@@ -40,7 +40,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: tmail
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     networks:
       - tmail-network
     restart: unless-stopped
@@ -117,7 +117,7 @@ services:
       - API_PORT=2525
       - DATABASE_URL=postgresql://user:password@db:5432/tmail
     ports:
-      - "2525:2525"
+      - "${SMTP_HOST_PORT:-2525}:2525"
     networks:
       - tmail-network
     restart: unless-stopped
