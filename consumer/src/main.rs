@@ -81,7 +81,7 @@ async fn main() {
             .as_long_string()
             .unwrap()
             .to_string();
-        let received_at = chrono::DateTime::parse_from_str(&received_at, "%d-%b-%Y %H:%M:%S %z")
+        let received_at = chrono::DateTime::parse_from_rfc3339(&received_at)
             .expect("Failed to parse received_at")
             .with_timezone(&chrono::Utc);
 

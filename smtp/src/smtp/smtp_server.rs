@@ -107,6 +107,13 @@ fn handle_mail_received(email: Email, channel: &Channel) {
         AmqpValue::LongString(email.to.join(";")),
     );
 
+    // Get current timestamp in RFC 3339 format
+    let received_at = chrono::Utc::now().to_rfc3339();
+    headers.insert(
+        "received_at".to_string(),
+        AmqpValue::LongString(received_at),
+    );
+
     let properties = AmqpProperties::default().with_headers(headers);
     let payload = email.data.as_bytes();
     Exchange::direct(channel)
