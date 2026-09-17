@@ -6,13 +6,7 @@ use util::{BodyStructure, Email};
 use crate::command::{BodyFetchable, Fetchable, Partial, Section, SectionText};
 
 /// Render one FETCH data item as the string to splice into the response.
-pub async fn get_fetchable(
-    db_pool: Arc<Pool<Postgres>>,
-    message_id: u64,
-    fetchable: &Fetchable,
-) -> String {
-    let id = message_id as i32;
-
+pub async fn get_fetchable(db_pool: Arc<Pool<Postgres>>, id: i32, fetchable: &Fetchable) -> String {
     // UID is storage bookkeeping, not part of the message - look it up directly.
     if let Fetchable::UID = fetchable {
         return get_uid(&db_pool, id).await;

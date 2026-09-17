@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use imap::imap_server::IMAPServer;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use sqlx::{AssertSqlSafe, Connection, PgConnection};
+use sqlx::{AssertSqlSafe, Connection, PgConnection, PgPool};
 
 /// Connection options for the Postgres instance the tests create their
 /// throwaway databases on. Override with `TEST_DATABASE_URL` (falls back to
@@ -47,6 +47,18 @@ pub struct TestServer {
     pub addr: SocketAddr,
     admin: PgConnectOptions,
     db_name: String,
+}
+
+impl TestServer {
+    /// A pool onto this server's database, for tests that need to set up state
+    /// no command can reach yet (a UID gap, say, with EXPUNGE unimplemented).
+    pub async fn db_pool(&self) -> PgPool {
+        PgPoolOptions::new()
+            .max_connections(1)
+            .connect_with(base_connect_options().database(&self.db_name))
+            .await
+            .expect("failed to connect to test database")
+    }
 }
 
 impl Deref for TestServer {

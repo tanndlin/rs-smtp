@@ -31,6 +31,17 @@ pub struct SelectedMailbox {
     name: String,
 }
 
+#[derive(Clone, Copy)]
+enum Addressing {
+    BySeq,
+    ByUid,
+}
+
+struct MessageRef {
+    id: i32,     // primary key to read the message by
+    seqnum: u64, // position in the mailbox to report it under
+}
+
 #[derive(Default)]
 enum SessionState {
     #[default]
@@ -131,7 +142,9 @@ impl IMAPSession {
                 ClientCommand::Lsub(cmd) => self.handle_lsub_command(cmd),
                 ClientCommand::Select(cmd) => self.handle_select_command(cmd).await,
                 ClientCommand::Status(cmd) => self.handle_status_command(cmd).await,
-                ClientCommand::Fetch(cmd) => self.handle_fetch_command(cmd).await,
+                ClientCommand::Fetch(cmd) => {
+                    self.handle_fetch_command(cmd, Addressing::BySeq).await
+                }
                 ClientCommand::Append(cmd) => self.handle_append_command(cmd).await,
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
                 ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
@@ -281,16 +294,53 @@ impl IMAPSession {
         StatusResponse::new(cmd, messages, next_uid, validity_uid, unseen, deleted).into()
     }
 
-    async fn handle_fetch_command(&self, cmd: FetchCommand) -> ServerResponse {
-        // `*` in a sequence set refers to the last message in the mailbox.
-        let last = sqlx::query_scalar!("SELECT COUNT(*) FROM mail")
-            .fetch_one(&*self.db_pool)
+    /// Resolve a sequence set against the messages that actually exist.
+    /// A number matching nothing is skipped
+    async fn resolve_sequence_set(
+        &self,
+        sequences: &[Sequence],
+        addressing: Addressing,
+    ) -> Vec<MessageRef> {
+        // A sequence number is a message's position in the mailbox ordered by
+        // UID, so one pass serves both addressing modes.
+        // TODO: Should be scoped to the selected mailbox once INBOX isn't the only one
+        let rows = sqlx::query!("SELECT id, uid FROM mail ORDER BY uid")
+            .fetch_all(&*self.db_pool)
             .await
-            .expect("failed to count messages")
-            .unwrap_or(0) as u64;
+            .expect("failed to list mailbox messages");
+
+        // `*` is the last message for a sequence number set, but the largest
+        // UID for a UID set - the two only coincide in a mailbox that has never
+        // been expunged.
+        let last = match addressing {
+            Addressing::BySeq => rows.len() as u64,
+            Addressing::ByUid => rows.last().map_or(0, |row| row.uid as u64),
+        };
+
+        rows.into_iter()
+            .enumerate()
+            .filter_map(|(i, row)| {
+                let seqnum = i as u64 + 1;
+                let n = match addressing {
+                    Addressing::BySeq => seqnum,
+                    Addressing::ByUid => row.uid as u64,
+                };
+
+                Sequence::set_contains(sequences, n, last)
+                    .then_some(MessageRef { id: row.id, seqnum })
+            })
+            .collect()
+    }
+
+    async fn handle_fetch_command(
+        &self,
+        cmd: FetchCommand,
+        addressing: Addressing,
+    ) -> ServerResponse {
+        let messages = self.resolve_sequence_set(&cmd.sequences, addressing).await;
 
         let mut responses = Vec::new();
-        for message_id in Sequence::to_message_ids(&cmd.sequences, last) {
+        for message in messages {
             let mut metadata: HashMap<String, String> = HashMap::new();
             for fetchable in &cmd.fetch_list {
                 let expanded: &[Fetchable] = match fetchable {
@@ -316,12 +366,14 @@ impl IMAPSession {
                 };
 
                 for fetchable in expanded {
-                    let value = get_fetchable(self.db_pool.clone(), message_id, fetchable).await;
+                    let value = get_fetchable(self.db_pool.clone(), message.id, fetchable).await;
                     metadata.insert(fetchable.to_string(), value);
                 }
             }
 
-            responses.push(FetchMessageResponse::new(message_id, metadata));
+            // Untagged FETCH responses are keyed by sequence number even when
+            // the client addressed the message by UID.
+            responses.push(FetchMessageResponse::new(message.seqnum, metadata));
         }
 
         FetchResponse::new(cmd.tag, responses).into()
@@ -394,14 +446,20 @@ impl IMAPSession {
         match cmd.command {
             UIDCommandType::Fetch {
                 sequences,
-                fetchable,
+                mut fetchable,
             } => {
+                // UID has to be reported whether or not it was asked for.
+                if !fetchable.contains(&Fetchable::UID) {
+                    fetchable.push(Fetchable::UID);
+                }
+
                 let fetch_cmd = FetchCommand {
                     tag: cmd.tag,
                     sequences,
                     fetch_list: fetchable,
                 };
-                self.handle_fetch_command(fetch_cmd).await
+                self.handle_fetch_command(fetch_cmd, Addressing::ByUid)
+                    .await
             }
             UIDCommandType::Store { sequences, store } => {
                 todo!();

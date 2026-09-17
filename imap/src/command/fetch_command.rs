@@ -23,39 +23,45 @@ pub enum Sequence {
     },
 }
 
-// TODO: I hate this API
 impl Sequence {
-    pub fn single_to_message_ids(&self, last: u64) -> Vec<u64> {
-        fn resolve(indicator: &FetchIndicator, last: u64) -> u64 {
-            match indicator {
-                FetchIndicator::Index(i) => *i,
-                FetchIndicator::Wild => last,
-            }
+    fn resolve(indicator: &FetchIndicator, last: u64) -> u64 {
+        match indicator {
+            FetchIndicator::Index(i) => *i,
+            FetchIndicator::Wild => last,
         }
+    }
 
+    /// The inclusive bounds this item covers, with `*` resolved to `last`.
+    ///
+    /// Ranges are normalised rather than rejected, so `559:*` still covers the
+    /// last message when 559 is past the end of the mailbox.
+    fn bounds(&self, last: u64) -> (u64, u64) {
         match self {
-            Sequence::Single(indicator) => match resolve(indicator, last) {
-                n if (1..=last).contains(&n) => vec![n],
-                _ => vec![],
-            },
+            Sequence::Single(indicator) => {
+                let n = Self::resolve(indicator, last);
+                (n, n)
+            }
             Sequence::Range { start, end } => {
-                let a = resolve(start, last);
-                let b = resolve(end, last);
-                let lo = a.min(b).max(1);
-                let hi = a.max(b).min(last);
-                (lo..=hi).collect()
+                let a = Self::resolve(start, last);
+                let b = Self::resolve(end, last);
+                (a.min(b).max(1), a.max(b).min(last))
             }
         }
     }
 
-    pub fn to_message_ids(sequences: &[Self], last: u64) -> Vec<u64> {
-        let mut ids: Vec<u64> = sequences
-            .iter()
-            .flat_map(|sequence| sequence.single_to_message_ids(last))
-            .collect();
-        ids.sort_unstable();
-        ids.dedup();
-        ids
+    /// Does this item cover `n`? `last` is the largest addressable value, which
+    /// is what `*` resolves to - the message count for a sequence number set,
+    /// the largest UID for a UID set.
+    pub fn contains(&self, n: u64, last: u64) -> bool {
+        let (lo, hi) = self.bounds(last);
+        (lo..=hi).contains(&n)
+    }
+
+    /// Does any item of a `sequence-set` cover `n`? Testing the messages that
+    /// exist against the set, rather than expanding the set, is what keeps a
+    /// sparse UID set like `1:4294967295` cheap.
+    pub fn set_contains(sequences: &[Self], n: u64, last: u64) -> bool {
+        sequences.iter().any(|sequence| sequence.contains(n, last))
     }
 
     pub fn parse_bytes(cursor: &mut Cursor<'_>) -> Result<Self, CommandParseError> {
@@ -600,6 +606,67 @@ client_command_from_impl!(FetchCommand, Fetch);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn set(buf: &[u8]) -> Vec<Sequence> {
+        Sequence::parse_set(&mut Cursor::new(buf)).unwrap()
+    }
+
+    /// `*` is the largest addressable value, whatever the caller addresses by.
+    #[test]
+    fn wild_resolves_to_last() {
+        let sequences = set(b"1:*");
+
+        // As sequence numbers over 3 messages.
+        assert!(Sequence::set_contains(&sequences, 3, 3));
+        assert!(!Sequence::set_contains(&sequences, 4, 3));
+
+        // As UIDs where the mailbox tops out at 90210 - the values the seqnum
+        // reading would have dropped are exactly the ones that must match.
+        assert!(Sequence::set_contains(&sequences, 4, 90210));
+        assert!(Sequence::set_contains(&sequences, 90210, 90210));
+    }
+
+    /// `559:*` covers the last message even when 559 is past the end of the
+    /// mailbox, because the range is normalised rather than rejected.
+    #[test]
+    fn range_past_the_end_still_covers_the_last_message() {
+        let sequences = set(b"559:*");
+
+        assert!(Sequence::set_contains(&sequences, 100, 100));
+        assert!(!Sequence::set_contains(&sequences, 99, 100));
+    }
+
+    /// A sparse set is matched, not expanded, so the full UID space is cheap.
+    #[test]
+    fn matches_across_the_whole_uid_space() {
+        let sequences = set(b"1:4294967295");
+
+        assert!(Sequence::set_contains(&sequences, 90210, 4294967295));
+        assert!(!Sequence::set_contains(&sequences, 0, 4294967295));
+    }
+
+    /// Every item of a comma separated set is consulted.
+    #[test]
+    fn set_matches_any_item() {
+        let sequences = set(b"1,3:5,9");
+
+        for n in [1, 3, 4, 5, 9] {
+            assert!(Sequence::set_contains(&sequences, n, 9), "{n} should match");
+        }
+        for n in [2, 6, 8, 10] {
+            assert!(
+                !Sequence::set_contains(&sequences, n, 9),
+                "{n} should not match"
+            );
+        }
+    }
+
+    /// An empty mailbox matches nothing rather than panicking on `*`.
+    #[test]
+    fn empty_mailbox_matches_nothing() {
+        assert!(!Sequence::set_contains(&set(b"1:*"), 1, 0));
+        assert!(!Sequence::set_contains(&set(b"*"), 1, 0));
+    }
 
     #[test]
     fn parses_basic_fetch() {
