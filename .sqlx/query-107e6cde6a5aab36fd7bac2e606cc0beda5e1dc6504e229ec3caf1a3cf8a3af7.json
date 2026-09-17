@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM mail WHERE uid = 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "107e6cde6a5aab36fd7bac2e606cc0beda5e1dc6504e229ec3caf1a3cf8a3af7"
+}
