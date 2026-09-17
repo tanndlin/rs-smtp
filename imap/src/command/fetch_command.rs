@@ -124,6 +124,7 @@ pub enum Fetchable {
     Envelope,
     Flags,
     Internaldate,
+    RFC822Header,
     RFC822Size,
     UID,
 }
@@ -148,6 +149,7 @@ impl FromStr for Fetchable {
             ("ENVELOPE", |_| Ok(Self::Envelope)),
             ("FLAGS", |_| Ok(Self::Flags)),
             ("INTERNALDATE", |_| Ok(Self::Internaldate)),
+            ("RFC822.HEADER", |_| Ok(Self::RFC822Header)),
             ("RFC822.SIZE", |_| Ok(Self::RFC822Size)),
             ("UID", |_| Ok(Self::UID)),
         ]);
@@ -248,6 +250,7 @@ impl fmt::Display for Fetchable {
             Fetchable::Envelope => f.write_str("ENVELOPE"),
             Fetchable::Flags => f.write_str("FLAGS"),
             Fetchable::Internaldate => f.write_str("INTERNALDATE"),
+            Fetchable::RFC822Header => f.write_str("RFC822.HEADER"),
             Fetchable::RFC822Size => f.write_str("RFC822.SIZE"),
             Fetchable::UID => f.write_str("UID"),
         }
