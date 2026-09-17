@@ -43,7 +43,11 @@ impl ClientCommand {
             "LOGOUT" => LogoutCommand::parse_bytes(tag, &mut cursor)?.into(),
             "UID" => UIDCommand::parse_bytes(tag, &mut cursor)?.into(),
             "CREATE" => CreateCommand::parse_bytes(tag, &mut cursor)?.into(),
-            _ => todo!("Probably havent implemented {command_text} yet"),
+            _ => {
+                return Err(CommandParseError::MalformedCommand(Some(format!(
+                    "unimplemented command {command_text:?}"
+                ))));
+            }
         };
 
         let bytes_read = cursor.pos;
