@@ -86,6 +86,7 @@ services:
       - tmail-network
     environment:
       - DATABASE_URL=postgresql://user:password@db:5432/tmail
+      - RUST_BACKTRACE=${RUST_BACKTRACE:-1}
     restart: unless-stopped
     pid: "host"
     develop:
