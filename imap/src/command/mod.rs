@@ -1,6 +1,7 @@
 mod append_command;
 mod capability_command;
 mod client_command;
+mod create_command;
 mod fetch_command;
 mod list_command;
 mod login_command;
@@ -14,6 +15,7 @@ mod uid_command;
 pub use append_command::AppendCommand;
 pub use capability_command::CapabilityCommand;
 pub use client_command::{ClientCommand, ClientCommandTrait};
+pub use create_command::CreateCommand;
 pub use fetch_command::{
     BinaryFetchable, BodyFetchable, FetchCommand, FetchIndicator, Fetchable, Partial, Section,
     SectionText, Sequence,

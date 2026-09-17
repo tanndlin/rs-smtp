@@ -4,17 +4,17 @@ use sqlx::{Pool, Postgres, types::chrono::Utc};
 
 use crate::{
     command::{
-        AppendCommand, BodyFetchable, ClientCommand, ClientCommandTrait, FetchCommand, Fetchable,
-        ListCommand, LogoutCommand, LsubCommand, SelectCommand, Sequence, StatusCommand,
-        UIDCommand, UIDCommandType,
+        AppendCommand, BodyFetchable, ClientCommand, ClientCommandTrait, CreateCommand,
+        FetchCommand, Fetchable, ListCommand, LogoutCommand, LsubCommand, SelectCommand, Sequence,
+        StatusCommand, UIDCommand, UIDCommandType,
     },
     cursor::Cursor,
     handle_fetch::get_fetchable,
     response::{
-        AppendOkResponse, CapabilityResponse, ContinuationResponse, FetchMessageResponse,
-        FetchResponse, Greeting, ListResponse, LoginResponse, LoginResult, LogoutResponse,
-        LsubResponse, MailboxListEntry, SelectResponse, ServerErrorReason, ServerErrorResponse,
-        ServerResponse, ServerResponseTrait, StatusResponse,
+        AppendOkResponse, CapabilityResponse, ContinuationResponse, CreateResponse,
+        FetchMessageResponse, FetchResponse, Greeting, ListResponse, LoginResponse, LoginResult,
+        LogoutResponse, LsubResponse, MailboxListEntry, SelectResponse, ServerErrorReason,
+        ServerErrorResponse, ServerResponse, ServerResponseTrait, StatusResponse,
     },
 };
 use util::Email;
@@ -136,6 +136,9 @@ impl IMAPSession {
                 ClientCommand::UID(cmd) => {
                     cmd.protocol_violation("Not authorized".to_string()).into()
                 }
+                ClientCommand::Create(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
             },
             SessionState::Authenticated => match command {
                 ClientCommand::List(cmd) => self.handle_list_command(cmd),
@@ -149,6 +152,7 @@ impl IMAPSession {
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
                 ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
                 ClientCommand::UID(cmd) => self.handle_uid(cmd).await,
+                ClientCommand::Create(cmd) => self.handle_create_command(cmd).await,
                 ClientCommand::StartTLS(_) | ClientCommand::Login(_) => {
                     todo!("This should return an error")
                 }
@@ -468,5 +472,29 @@ impl IMAPSession {
                 todo!();
             }
         }
+    }
+
+    async fn handle_create_command(&self, cmd: CreateCommand) -> ServerResponse {
+        // Check if the mailbox exists
+        let mailbox = sqlx::query!("SELECT name FROM mailboxes WHERE name = $1", cmd.mailbox)
+            .fetch_optional(&*self.db_pool)
+            .await
+            .expect("Failed to look up mailbox");
+        if mailbox.is_some() {
+            return ServerResponse::Error(ServerErrorResponse {
+                tag: Some(cmd.tag.to_string()),
+                reason: ServerErrorReason::Deny("ALREADYEXISTS".to_string()),
+            });
+        }
+
+        let uid_validity = sqlx::query_scalar!(
+            "INSERT INTO mailboxes (name, uid_validity, uid_next) VALUES ($1, 1, 1) RETURNING uid_validity",
+            cmd.mailbox
+        )
+        .fetch_one(&*self.db_pool)
+        .await
+        .expect("Failed to create mailbox");
+
+        CreateResponse::new(cmd.tag, uid_validity as u32).into()
     }
 }

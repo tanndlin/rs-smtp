@@ -1,7 +1,7 @@
 use crate::{
     command::{
-        AppendCommand, CapabilityCommand, FetchCommand, ListCommand, LoginCommand, LogoutCommand,
-        LsubCommand, SelectCommand, StartTLSCommand, StatusCommand, UIDCommand,
+        AppendCommand, CapabilityCommand, CreateCommand, FetchCommand, ListCommand, LoginCommand,
+        LogoutCommand, LsubCommand, SelectCommand, StartTLSCommand, StatusCommand, UIDCommand,
     },
     cursor::Cursor,
     errors::CommandParseError,
@@ -21,6 +21,7 @@ pub enum ClientCommand {
     Append(AppendCommand),
     Logout(LogoutCommand),
     UID(UIDCommand),
+    Create(CreateCommand),
 }
 
 impl ClientCommand {
@@ -41,6 +42,7 @@ impl ClientCommand {
             "APPEND" => AppendCommand::parse_bytes(tag, &mut cursor)?.into(),
             "LOGOUT" => LogoutCommand::parse_bytes(tag, &mut cursor)?.into(),
             "UID" => UIDCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "CREATE" => CreateCommand::parse_bytes(tag, &mut cursor)?.into(),
             _ => todo!("Probably havent implemented {command_text} yet"),
         };
 

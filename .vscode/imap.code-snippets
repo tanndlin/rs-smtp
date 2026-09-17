@@ -1,0 +1,53 @@
+{
+    "New Client Command": {
+        "scope": "rust",
+        "prefix": "client_command",
+        "body": [
+            "use crate::{",
+            "    client_command_from_impl,",
+            "    command::{ClientCommand, client_command::ClientCommandTrait},",
+            "    cursor::Cursor,",
+            "    errors::CommandParseError,",
+            "};",
+            "",
+            "#[derive(Debug)]",
+            "pub struct ${1:Name}Command {",
+            "    pub tag: String,",
+            "}",
+            "",
+            "impl ClientCommandTrait for ${1:Name}Command {",
+            "    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {",
+            "        todo!()",
+            "    }",
+            "",
+            "    fn tag(&self) -> &str {",
+            "        &self.tag",
+            "    }",
+            "}",
+            "",
+            "client_command_from_impl!(${1:Name}Command, ${1:Name});",
+        ]
+    },
+    "New Server Response": {
+        "scope": "rust",
+        "prefix": "server_response",
+        "body": [
+            "use util::EncodeTo;",
+            "",
+            "use crate::{response::ServerResponse, server_response_from_impl};",
+            "",
+            "#[derive(Debug)]",
+            "pub struct ${1:Name}Response {",
+            "    request_tag: String,",
+            "}",
+            "",
+            "server_response_from_impl!(${1:Name}Response, ${1:Name});",
+            "",
+            "impl EncodeTo for ${1:Name}Response {",
+            "    fn encode_to(self, buf: &mut Vec<u8>) {",
+            "        todo!()",
+            "    }",
+            "}",
+        ]
+    }
+}
