@@ -124,8 +124,12 @@ pub enum Fetchable {
     Envelope,
     Flags,
     Internaldate,
+    RFC822,
     RFC822Header,
+    RFC822Peek,
     RFC822Size,
+    RFC822Text,
+    RFC822TextPeek,
     UID,
 }
 
@@ -149,8 +153,12 @@ impl FromStr for Fetchable {
             ("ENVELOPE", |_| Ok(Self::Envelope)),
             ("FLAGS", |_| Ok(Self::Flags)),
             ("INTERNALDATE", |_| Ok(Self::Internaldate)),
+            ("RFC822", |_| Ok(Self::RFC822)),
             ("RFC822.HEADER", |_| Ok(Self::RFC822Header)),
+            ("RFC822.PEEK", |_| Ok(Self::RFC822Peek)),
             ("RFC822.SIZE", |_| Ok(Self::RFC822Size)),
+            ("RFC822.TEXT", |_| Ok(Self::RFC822Text)),
+            ("RFC822.TEXT.PEEK", |_| Ok(Self::RFC822TextPeek)),
             ("UID", |_| Ok(Self::UID)),
         ]);
 
@@ -250,8 +258,12 @@ impl fmt::Display for Fetchable {
             Fetchable::Envelope => f.write_str("ENVELOPE"),
             Fetchable::Flags => f.write_str("FLAGS"),
             Fetchable::Internaldate => f.write_str("INTERNALDATE"),
+            Fetchable::RFC822 => f.write_str("RFC822"),
             Fetchable::RFC822Header => f.write_str("RFC822.HEADER"),
+            Fetchable::RFC822Peek => f.write_str("RFC822"),
             Fetchable::RFC822Size => f.write_str("RFC822.SIZE"),
+            Fetchable::RFC822Text => f.write_str("RFC822.TEXT"),
+            Fetchable::RFC822TextPeek => f.write_str("RFC822.TEXT"),
             Fetchable::UID => f.write_str("UID"),
         }
     }

@@ -26,7 +26,39 @@ pub async fn get_fetchable(db_pool: Arc<Pool<Postgres>>, id: i32, fetchable: &Fe
                 partial: None,
             },
         ),
+        Fetchable::RFC822 => handle_body(
+            email,
+            &BodyFetchable::Section {
+                peek: false,
+                section: Section::Full,
+                partial: None,
+            },
+        ),
+        Fetchable::RFC822Peek => handle_body(
+            email,
+            &BodyFetchable::Section {
+                peek: true,
+                section: Section::Full,
+                partial: None,
+            },
+        ),
         Fetchable::RFC822Size => email.raw_eml.len().to_string(),
+        Fetchable::RFC822Text => handle_body(
+            email,
+            &BodyFetchable::Section {
+                peek: false,
+                section: Section::Msg(SectionText::Text),
+                partial: None,
+            },
+        ),
+        Fetchable::RFC822TextPeek => handle_body(
+            email,
+            &BodyFetchable::Section {
+                peek: true,
+                section: Section::Msg(SectionText::Text),
+                partial: None,
+            },
+        ),
         Fetchable::All => unreachable!("expanded before reaching get_fetchable"),
         Fetchable::Fast => unreachable!("expanded before reaching get_fetchable"),
         Fetchable::Full => unreachable!("expanded before reaching get_fetchable"),
