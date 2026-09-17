@@ -1,7 +1,8 @@
 use crate::{
     command::{
         AppendCommand, CapabilityCommand, CreateCommand, FetchCommand, ListCommand, LoginCommand,
-        LogoutCommand, LsubCommand, SelectCommand, StartTLSCommand, StatusCommand, UIDCommand,
+        LogoutCommand, LsubCommand, NoopCommand, SelectCommand, StartTLSCommand, StatusCommand,
+        UIDCommand,
     },
     cursor::Cursor,
     errors::CommandParseError,
@@ -22,6 +23,7 @@ pub enum ClientCommand {
     Logout(LogoutCommand),
     UID(UIDCommand),
     Create(CreateCommand),
+    Noop(NoopCommand),
 }
 
 impl ClientCommand {
@@ -43,6 +45,7 @@ impl ClientCommand {
             "LOGOUT" => LogoutCommand::parse_bytes(tag, &mut cursor)?.into(),
             "UID" => UIDCommand::parse_bytes(tag, &mut cursor)?.into(),
             "CREATE" => CreateCommand::parse_bytes(tag, &mut cursor)?.into(),
+            "NOOP" => NoopCommand::parse_bytes(tag, &mut cursor)?.into(),
             _ => {
                 return Err(CommandParseError::MalformedCommand(Some(format!(
                     "unimplemented command {command_text:?}"

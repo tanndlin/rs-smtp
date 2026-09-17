@@ -13,8 +13,9 @@ use crate::{
     response::{
         AppendOkResponse, CapabilityResponse, ContinuationResponse, CreateResponse,
         FetchMessageResponse, FetchResponse, Greeting, ListResponse, LoginResponse, LoginResult,
-        LogoutResponse, LsubResponse, MailboxListEntry, SelectResponse, ServerErrorReason,
-        ServerErrorResponse, ServerResponse, ServerResponseTrait, StatusResponse,
+        LogoutResponse, LsubResponse, MailboxListEntry, NoopResponse, SelectResponse,
+        ServerErrorReason, ServerErrorResponse, ServerResponse, ServerResponseTrait,
+        StatusResponse,
     },
 };
 use util::Email;
@@ -114,6 +115,7 @@ impl IMAPSession {
                     }
                 }
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
+                ClientCommand::Noop(noop_command) => NoopResponse::respond_to(noop_command).into(),
                 ClientCommand::List(cmd) => {
                     cmd.protocol_violation("Not authorized".to_string()).into()
                 }
@@ -152,6 +154,7 @@ impl IMAPSession {
                 ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
                 ClientCommand::UID(cmd) => self.handle_uid(cmd).await,
                 ClientCommand::Create(cmd) => self.handle_create_command(cmd).await,
+                ClientCommand::Noop(noop_command) => NoopResponse::respond_to(noop_command).into(),
                 ClientCommand::StartTLS(_) | ClientCommand::Login(_) => {
                     todo!("This should return an error")
                 }
