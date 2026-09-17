@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 use util::EncodeTo;
 
@@ -30,7 +30,6 @@ impl EncodeTo for FetchResponse {
     }
 }
 
-#[derive(Debug)]
 pub struct FetchMessageResponse {
     message_id: u64,
     metadata: HashMap<String, String>,
@@ -59,6 +58,41 @@ impl EncodeTo for FetchMessageResponse {
             )
             .as_bytes(),
         );
+    }
+}
+
+/// A metadata value can hold a whole message body, so `Debug` prints only the
+/// first `DEBUG_VALUE_LIMIT` characters of each one.
+const DEBUG_VALUE_LIMIT: usize = 80;
+
+struct TruncatedValue<'a>(&'a str);
+
+impl fmt::Debug for TruncatedValue<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = self.0;
+        match value.char_indices().nth(DEBUG_VALUE_LIMIT) {
+            Some((end, _)) => write!(f, "{:?}... ({} bytes total)", &value[..end], value.len()),
+            None => write!(f, "{value:?}"),
+        }
+    }
+}
+
+struct TruncatedMetadata<'a>(&'a HashMap<String, String>);
+
+impl fmt::Debug for TruncatedMetadata<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map()
+            .entries(self.0.iter().map(|(k, v)| (k, TruncatedValue(v))))
+            .finish()
+    }
+}
+
+impl fmt::Debug for FetchMessageResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FetchMessageResponse")
+            .field("message_id", &self.message_id)
+            .field("metadata", &TruncatedMetadata(&self.metadata))
+            .finish()
     }
 }
 
