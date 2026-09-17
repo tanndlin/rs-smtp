@@ -82,8 +82,7 @@ impl IMAPSession {
             append_cmd.message = Some(cursor.raw(length).to_vec());
             let res = self.handle_command(append_cmd.into()).await;
             self.expecting_append_mail = None;
-            cursor.eat(b'\r')?;
-            cursor.eat(b'\n')?;
+            cursor.expect_crlf()?;
             return Ok((res, length + 2));
         }
 

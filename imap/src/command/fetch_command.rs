@@ -601,8 +601,7 @@ impl ClientCommandTrait for FetchCommand {
             )));
         }
 
-        cursor.eat(b'\r')?;
-        cursor.eat(b'\n')?;
+        cursor.expect_crlf()?;
 
         Ok(Self {
             tag,

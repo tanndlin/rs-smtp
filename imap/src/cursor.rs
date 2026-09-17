@@ -101,8 +101,7 @@ impl<'a> Cursor<'a> {
             }
 
             self.eat(b'}')?;
-            self.eat(b'\r')?;
-            self.eat(b'\n')?;
+            self.expect_crlf()?;
 
             let start = self.pos;
             self.pos += size as usize;
@@ -309,6 +308,12 @@ impl<'a> Cursor<'a> {
         }
 
         self.number().map(FetchIndicator::Index)
+    }
+
+    pub fn expect_crlf(&mut self) -> Result<(), ParseError> {
+        self.eat(b'\r')?;
+        self.eat(b'\n')?;
+        Ok(())
     }
 }
 

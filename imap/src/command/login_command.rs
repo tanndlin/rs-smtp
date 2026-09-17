@@ -17,8 +17,7 @@ impl ClientCommandTrait for LoginCommand {
         let user = cursor.string()?.to_string();
         let pass = cursor.string()?.to_string();
 
-        cursor.eat(b'\r')?;
-        cursor.eat(b'\n')?;
+        cursor.expect_crlf()?;
 
         Ok(Self { tag, user, pass })
     }

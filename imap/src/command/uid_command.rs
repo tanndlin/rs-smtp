@@ -79,8 +79,7 @@ impl ClientCommandTrait for UIDCommand {
             }
         };
 
-        cursor.eat(b'\r')?;
-        cursor.eat(b'\n')?;
+        cursor.expect_crlf()?;
 
         Ok(Self { tag, command })
     }

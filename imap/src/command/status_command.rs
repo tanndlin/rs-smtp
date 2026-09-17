@@ -32,8 +32,7 @@ impl ClientCommandTrait for StatusCommand {
         let deleted = flags.contains(&"DELETED");
         let size = flags.contains(&"SIZE");
 
-        cursor.eat(b'\r')?;
-        cursor.eat(b'\n')?;
+        cursor.expect_crlf()?;
         Ok(Self {
             tag,
             mailbox,

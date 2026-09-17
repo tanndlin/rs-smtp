@@ -15,8 +15,7 @@ impl ClientCommandTrait for SelectCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         let mailbox = cursor.string().unwrap().to_string();
 
-        cursor.eat(b'\r')?;
-        cursor.eat(b'\n')?;
+        cursor.expect_crlf()?;
 
         Ok(Self { tag, mailbox })
     }

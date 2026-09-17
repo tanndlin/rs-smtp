@@ -53,13 +53,11 @@ impl ClientCommandTrait for AppendCommand {
         let message_length = cursor.number()? as usize;
         let sending_now = cursor.eat(b'+').is_ok();
         cursor.eat(b'}')?;
-        cursor.eat(b'\r')?;
-        cursor.eat(b'\n')?;
+        cursor.expect_crlf()?;
 
         let message = if sending_now {
             let message = cursor.raw(message_length);
-            cursor.eat(b'\r')?;
-            cursor.eat(b'\n')?;
+            cursor.expect_crlf()?;
             Some(message)
         } else {
             None

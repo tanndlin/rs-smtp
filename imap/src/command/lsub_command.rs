@@ -17,8 +17,7 @@ impl ClientCommandTrait for LsubCommand {
         let reference_name = cursor.string()?.to_string();
         let mailbox = cursor.list_mailbox()?.to_string();
 
-        cursor.eat(b'\r')?;
-        cursor.eat(b'\n')?;
+        cursor.expect_crlf()?;
 
         Ok(Self {
             tag,

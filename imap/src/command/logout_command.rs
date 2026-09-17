@@ -12,8 +12,7 @@ pub struct LogoutCommand {
 
 impl ClientCommandTrait for LogoutCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
-        cursor.eat(b'\r')?;
-        cursor.eat(b'\n')?;
+        cursor.expect_crlf()?;
         Ok(Self { tag })
     }
 
