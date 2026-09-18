@@ -33,7 +33,13 @@ impl SMTPServer {
         println!("Listening on {}", self.addr);
 
         loop {
-            let (stream, addr) = listener.accept().unwrap();
+            let (stream, addr) = match listener.accept() {
+                Ok(conn) => conn,
+                Err(e) => {
+                    println!("Failed to accept connection: {e}");
+                    continue;
+                }
+            };
             let connection = self.connection.clone();
             thread::spawn(move || handle_request(stream, addr, &connection));
         }
