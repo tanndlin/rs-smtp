@@ -141,7 +141,7 @@ fn literal(data: &str, partial: &Option<Partial>) -> String {
 
 fn msg_section(email: &Email, text: &SectionText) -> String {
     match text {
-        SectionText::Header => email.get_headers(),
+        SectionText::Header => email.get_headers().to_owned(),
         SectionText::HeaderFields(names) => select_headers(email, names, true),
         SectionText::HeaderFieldsNot(names) => select_headers(email, names, false),
         SectionText::Text => body_octets(&email.raw_eml).to_string(),

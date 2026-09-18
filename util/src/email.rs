@@ -206,8 +206,9 @@ impl Email {
         .await
     }
 
-    pub fn get_headers(&self) -> String {
-        let (res, _) = self.raw_eml.split_once("\r\n\r\n").unwrap();
-        res.to_string()
+    pub fn get_headers(&self) -> &str {
+        self.raw_eml
+            .split_once("\r\n\r\n")
+            .map_or(&self.raw_eml[..], |(h, _)| h)
     }
 }

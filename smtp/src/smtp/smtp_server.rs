@@ -1,8 +1,6 @@
 use std::{
     collections::BTreeMap,
-    fs,
     net::{SocketAddr, TcpListener, TcpStream},
-    path::Path,
     sync::{Arc, Mutex, PoisonError},
     thread::{self},
 };

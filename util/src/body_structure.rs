@@ -17,13 +17,11 @@ impl From<&Email> for BodyStructure {
         let content_type_header = email.header("Content-Type").unwrap_or("text/plain");
         let content_type = content_type_header
             .split_once(';')
-            .map(|(t, _)| t)
-            .unwrap_or(content_type_header)
+            .map_or(content_type_header, |(t, _)| t)
             .to_owned();
         let content_subtype = content_type_header
             .split_once('/')
-            .map(|(_, s)| s)
-            .unwrap_or("plain")
+            .map_or("plain", |(_, s)| s)
             .to_owned();
         let body_parameters = vec![("CHARSET".to_string(), "US-ASCII".to_string())]; // TODO
         let content_id = email.header("Content-ID").map(str::to_string);
@@ -31,12 +29,8 @@ impl From<&Email> for BodyStructure {
         let content_transfer_encoding = email
             .header("Content-Transfer-Encoding")
             .map(str::to_string);
-        let size = email.body_text.as_ref().map(|b| b.len()).unwrap_or(0);
-        let lines = email
-            .body_text
-            .as_ref()
-            .map(|b| b.lines().count())
-            .unwrap_or(0);
+        let size = email.body_text.as_ref().map_or(0, String::len);
+        let lines = email.body_text.as_ref().map_or(0, |b| b.lines().count());
 
         Self {
             content_type,
