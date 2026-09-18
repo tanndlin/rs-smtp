@@ -28,10 +28,9 @@ impl SMTPState {
 
     pub fn handle_data_content(&mut self, data: &str) -> Option<Response> {
         if data == ".\r\n" {
-            self.receiving_data = false;
             let email = Email::from(&*self);
             (self.received_callback)(email);
-            self.data.clear();
+            self.reset_transaction();
             return Some(Response::Ok);
         }
 
@@ -54,14 +53,16 @@ impl SMTPState {
         }
     }
 
-    /// RFC 5321 4.1.1.5: RSET clears the current mail transaction (sender,
-    /// recipients, buffered data) but keeps the HELO/EHLO identity.
     fn handle_reset(&mut self) -> Response {
+        self.reset_transaction();
+        Response::Ok
+    }
+
+    fn reset_transaction(&mut self) {
         self.from = None;
         self.recipient.clear();
         self.data.clear();
         self.receiving_data = false;
-        Response::Ok
     }
 
     fn handle_extended_hello(&mut self, ehlo: ExtendedHelloMessage) -> Response {
