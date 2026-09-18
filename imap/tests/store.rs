@@ -121,6 +121,10 @@ async fn store_replace_sets_exactly_the_given_flags() {
         !resp.contains("BAD"),
         "the whole command line should be consumed, leaving nothing to reparse: {resp:?}"
     );
+    assert!(
+        !resp.contains("UID"),
+        "plain STORE addresses by seqnum, so no UID is owed: {resp:?}"
+    );
     assert_eq!(fetch_flags(&mut stream, 2), set(&["\\Answered"]));
 }
 
@@ -288,6 +292,11 @@ async fn uid_store_addresses_by_uid() {
         flags_for(&resp, 2),
         Some(set(&["\\Answered"])),
         "expected UID 3 to be answered as seqnum 2: {resp:?}"
+    );
+    assert!(
+        resp.lines()
+            .any(|l| l.starts_with("* 2 FETCH (") && l.contains("UID 3")),
+        "expected the UID in the untagged FETCH: {resp:?}"
     );
     assert!(resp.contains("a4 OK"), "expected tagged OK: {resp:?}");
     assert_eq!(fetch_flags(&mut stream, 2), set(&["\\Answered"]));

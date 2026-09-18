@@ -41,6 +41,7 @@ enum Addressing {
 struct MessageRef {
     id: i32,     // primary key to read the message by
     seqnum: u64, // position in the mailbox to report it under
+    uid: i32,
 }
 
 #[derive(Default)]
@@ -339,7 +340,11 @@ impl IMAPSession {
                 };
 
                 Sequence::set_contains(sequences, n, last)
-                    .then_some(MessageRef { id: row.id, seqnum })
+                    .then_some(MessageRef {
+                        id: row.id,
+                        seqnum,
+                        uid: row.uid,
+                    })
             })
             .collect()
     }
@@ -536,6 +541,11 @@ impl IMAPSession {
             }
 
             metadata.insert(Fetchable::Flags.to_string(), flags);
+            // As with UID FETCH, the client has no sequence number to key a
+            // UID STORE response on, so the UID always comes back.
+            if let Addressing::ByUid = by_uid {
+                metadata.insert(Fetchable::UID.to_string(), message.uid.to_string());
+            }
             responses.push(FetchMessageResponse::new(message.seqnum, metadata));
         }
 
