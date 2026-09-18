@@ -1,4 +1,6 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
+
+use sqlx::{Pool, Postgres};
 
 use crate::{
     client_command_from_impl,
@@ -35,6 +37,83 @@ pub struct Store {
     pub silent: bool,
     pub flags: Vec<String>,
 }
+impl Store {
+    pub fn parse(cursor: &mut Cursor) -> Result<Store, CommandParseError> {
+        // `+`, `-` and `.` are all atom chars, so the operation, `FLAGS` and
+        // `.SILENT` come back as one atom.
+        let att = cursor.atom()?.to_uppercase();
+        let (operation, flags_att) = match att.as_bytes().first() {
+            Some(b'+') => (StoreOperation::Add, &att[1..]),
+            Some(b'-') => (StoreOperation::Remove, &att[1..]),
+            _ => (StoreOperation::Replace, att.as_str()),
+        };
+
+        let silent = match flags_att {
+            "FLAGS" => false,
+            "FLAGS.SILENT" => true,
+            _ => {
+                return Err(CommandParseError::MalformedCommand(Some(format!(
+                    "UID STORE: expected FLAGS or FLAGS.SILENT, got {att:?}"
+                ))));
+            }
+        };
+
+        let flags = if cursor.peek_nonspace() == Some(b'(') {
+            // `flag-list`, which may be empty - `FLAGS ()` clears every flag.
+            cursor.paren_list(|c| c.flag().map(|f| f.to_string()))?
+        } else {
+            // `flag *(SP flag)`. `paren_list` can't take this form because a flag
+            // starts with `\`, which is not an atom char.
+            let mut flags = vec![cursor.flag()?.to_string()];
+            while cursor.peek_nonspace() == Some(b'\\') {
+                flags.push(cursor.flag()?.to_string());
+            }
+
+            flags
+        };
+
+        Ok(Store {
+            operation,
+            silent,
+            flags,
+        })
+    }
+
+    pub async fn apply_to_message(&self, db_pool: Arc<Pool<Postgres>>, id: i32) -> String {
+        let op = match self.operation {
+            StoreOperation::Replace => "replace",
+            StoreOperation::Add => "add",
+            StoreOperation::Remove => "remove",
+        };
+
+        let flags = sqlx::query_scalar!(
+            r#"UPDATE mail SET flags = CASE $3
+               WHEN 'remove' THEN ARRAY(
+                   SELECT f FROM unnest(flags) WITH ORDINALITY AS t(f, n)
+                   WHERE lower(f) <> ALL (SELECT lower(r) FROM unnest($1::text[]) AS r)
+                   ORDER BY n)
+               ELSE ARRAY(
+                   SELECT f FROM (
+                       SELECT DISTINCT ON (lower(f)) f, n
+                       FROM unnest(CASE $3 WHEN 'add' THEN flags ELSE '{}'::text[] END || $1::text[])
+                            WITH ORDINALITY AS t(f, n)
+                       ORDER BY lower(f), n
+                   ) AS d
+                   ORDER BY n)
+           END
+           WHERE id = $2
+           RETURNING flags"#,
+            &self.flags,
+            id,
+            op
+        )
+        .fetch_one(&*db_pool)
+        .await
+        .expect("Failed to store flags");
+
+        format!("({})", flags.join(" "))
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum StoreOperation {
@@ -62,7 +141,7 @@ impl ClientCommandTrait for UIDCommand {
             }
             "STORE" => {
                 let sequences = Sequence::parse_set(cursor)?;
-                let store = parse_store(cursor)?;
+                let store = Store::parse(cursor)?;
 
                 UIDCommandType::Store { sequences, store }
             }
@@ -87,49 +166,6 @@ impl ClientCommandTrait for UIDCommand {
     fn tag(&self) -> &str {
         &self.tag
     }
-}
-
-/// Parse a `store-att-flags`: the operation, its optional `.SILENT` suffix and
-/// the flags to apply.
-fn parse_store(cursor: &mut Cursor) -> Result<Store, CommandParseError> {
-    // `+`, `-` and `.` are all atom chars, so the operation, `FLAGS` and
-    // `.SILENT` come back as one atom.
-    let att = cursor.atom()?.to_uppercase();
-    let (operation, flags_att) = match att.as_bytes().first() {
-        Some(b'+') => (StoreOperation::Add, &att[1..]),
-        Some(b'-') => (StoreOperation::Remove, &att[1..]),
-        _ => (StoreOperation::Replace, att.as_str()),
-    };
-
-    let silent = match flags_att {
-        "FLAGS" => false,
-        "FLAGS.SILENT" => true,
-        _ => {
-            return Err(CommandParseError::MalformedCommand(Some(format!(
-                "UID STORE: expected FLAGS or FLAGS.SILENT, got {att:?}"
-            ))));
-        }
-    };
-
-    let flags = if cursor.peek_nonspace() == Some(b'(') {
-        // `flag-list`, which may be empty - `FLAGS ()` clears every flag.
-        cursor.paren_list(|c| c.flag().map(|f| f.to_string()))?
-    } else {
-        // `flag *(SP flag)`. `paren_list` can't take this form because a flag
-        // starts with `\`, which is not an atom char.
-        let mut flags = vec![cursor.flag()?.to_string()];
-        while cursor.peek_nonspace() == Some(b'\\') {
-            flags.push(cursor.flag()?.to_string());
-        }
-
-        flags
-    };
-
-    Ok(Store {
-        operation,
-        silent,
-        flags,
-    })
 }
 
 client_command_from_impl!(UIDCommand, UID);
@@ -163,7 +199,7 @@ mod tests {
         ));
         assert_eq!(store.operation, StoreOperation::Add);
         assert!(!store.silent);
-        assert_eq!(store.flags, vec!["\\DELETED".to_string()]);
+        assert_eq!(store.flags, vec!["\\Deleted".to_string()]);
     }
 
     /// `-FLAGS.SILENT` removes flags and suppresses the untagged FETCHes.
@@ -179,7 +215,7 @@ mod tests {
         assert!(store.silent);
         assert_eq!(
             store.flags,
-            vec!["\\SEEN".to_string(), "\\FLAGGED".to_string()]
+            vec!["\\Seen".to_string(), "\\Flagged".to_string()]
         );
     }
 
@@ -194,7 +230,7 @@ mod tests {
 
         assert_eq!(store.operation, StoreOperation::Replace);
         assert!(!store.silent);
-        assert_eq!(store.flags, vec!["\\SEEN".to_string()]);
+        assert_eq!(store.flags, vec!["\\Seen".to_string()]);
     }
 
     /// `FLAGS ()` is legal and clears every flag.
@@ -219,7 +255,7 @@ mod tests {
 
         assert_eq!(
             store.flags,
-            vec!["\\SEEN".to_string(), "\\ANSWERED".to_string()]
+            vec!["\\Seen".to_string(), "\\Answered".to_string()]
         );
     }
 

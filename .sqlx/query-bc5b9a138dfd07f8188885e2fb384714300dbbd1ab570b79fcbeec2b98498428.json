@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE mail SET flags = $1 WHERE uid = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bc5b9a138dfd07f8188885e2fb384714300dbbd1ab570b79fcbeec2b98498428"
+}

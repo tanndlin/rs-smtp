@@ -6,7 +6,7 @@ use crate::{
     command::{
         AppendCommand, BodyFetchable, ClientCommand, ClientCommandTrait, CreateCommand,
         FetchCommand, Fetchable, ListCommand, LogoutCommand, LsubCommand, SelectCommand, Sequence,
-        StatusCommand, UIDCommand, UIDCommandType,
+        StatusCommand, StoreCommand, UIDCommand, UIDCommandType,
     },
     cursor::Cursor,
     handle_fetch::get_fetchable,
@@ -140,6 +140,9 @@ impl IMAPSession {
                 ClientCommand::Create(cmd) => {
                     cmd.protocol_violation("Not authorized".to_string()).into()
                 }
+                ClientCommand::Store(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
             },
             SessionState::Authenticated => match command {
                 ClientCommand::List(cmd) => self.handle_list_command(cmd),
@@ -154,6 +157,9 @@ impl IMAPSession {
                 ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
                 ClientCommand::UID(cmd) => self.handle_uid(cmd).await,
                 ClientCommand::Create(cmd) => self.handle_create_command(cmd).await,
+                ClientCommand::Store(cmd) => {
+                    self.handle_store_command(cmd, Addressing::BySeq).await
+                }
                 ClientCommand::Noop(noop_command) => NoopResponse::respond_to(noop_command).into(),
                 ClientCommand::StartTLS(_) | ClientCommand::Login(_) => {
                     todo!("This should return an error")
@@ -416,10 +422,11 @@ impl IMAPSession {
     /// Persist an appended message and allocate it a UID in `cmd.mailbox`.
     /// Returns `(uid_validity, uid)` for the `APPENDUID` response code.
     async fn store_appended_message(&self, cmd: &AppendCommand, message: &[u8]) -> (u32, u32) {
-        let email = Email::from_raw(
+        let mut email = Email::from_raw(
             cmd.date_time.unwrap_or_else(Utc::now),
             String::from_utf8_lossy(message).into_owned(),
         );
+        email.flags = cmd.flags.clone();
 
         let mut tx = self
             .db_pool
@@ -468,7 +475,13 @@ impl IMAPSession {
                     .await
             }
             UIDCommandType::Store { sequences, store } => {
-                todo!();
+                let store_cmd = StoreCommand {
+                    tag: cmd.tag,
+                    sequences,
+                    store,
+                };
+                self.handle_store_command(store_cmd, Addressing::ByUid)
+                    .await
             }
             UIDCommandType::Copy { sequences, mailbox } => {
                 todo!();
@@ -498,5 +511,34 @@ impl IMAPSession {
         .expect("Failed to create mailbox");
 
         CreateResponse::new(cmd.tag, uid_validity as u32).into()
+    }
+
+    async fn handle_store_command(
+        &self,
+        store_cmd: StoreCommand,
+        by_uid: Addressing,
+    ) -> ServerResponse {
+        let messages = self
+            .resolve_sequence_set(&store_cmd.sequences, by_uid)
+            .await;
+
+        let mut responses = Vec::new();
+        for message in messages {
+            let mut metadata: HashMap<String, String> = HashMap::new();
+            let flags = store_cmd
+                .store
+                .apply_to_message(self.db_pool.clone(), message.id)
+                .await;
+
+            // `.SILENT` still applies the change, it just doesn't report it.
+            if store_cmd.store.silent {
+                continue;
+            }
+
+            metadata.insert(Fetchable::Flags.to_string(), flags);
+            responses.push(FetchMessageResponse::new(message.seqnum, metadata));
+        }
+
+        FetchResponse::new(store_cmd.tag, responses).into()
     }
 }

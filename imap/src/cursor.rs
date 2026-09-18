@@ -292,8 +292,15 @@ impl<'a> Cursor<'a> {
 
     pub fn flag(&mut self) -> Result<Cow<'a, str>, ParseError> {
         self.eat(b'\\')?;
-        let atom = self.atom()?.to_uppercase();
-        Ok(Cow::Owned(format!("\\{atom}")))
+        let atom = self.atom()?;
+        // Flags are case-insensitive, but the server matches system flags by
+        // their canonical spelling (e.g. `\Seen` for UNSEEN), so fold those to
+        // it. Anything else is kept as the client sent it.
+        let name = ["Answered", "Flagged", "Deleted", "Seen", "Draft"]
+            .into_iter()
+            .find(|f| f.eq_ignore_ascii_case(atom))
+            .unwrap_or(atom);
+        Ok(Cow::Owned(format!("\\{name}")))
     }
 
     pub fn sequence_indicator(&mut self) -> Result<FetchIndicator, ParseError> {

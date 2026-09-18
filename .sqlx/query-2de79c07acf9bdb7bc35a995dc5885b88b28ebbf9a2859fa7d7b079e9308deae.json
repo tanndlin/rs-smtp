@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE mail SET flags = CASE $3\n               WHEN 'remove' THEN ARRAY(\n                   SELECT f FROM unnest(flags) WITH ORDINALITY AS t(f, n)\n                   WHERE lower(f) <> ALL (SELECT lower(r) FROM unnest($1::text[]) AS r)\n                   ORDER BY n)\n               ELSE ARRAY(\n                   SELECT f FROM (\n                       SELECT DISTINCT ON (lower(f)) f, n\n                       FROM unnest(CASE $3 WHEN 'add' THEN flags ELSE '{}'::text[] END || $1::text[])\n                            WITH ORDINALITY AS t(f, n)\n                       ORDER BY lower(f), n\n                   ) AS d\n                   ORDER BY n)\n           END\n           WHERE id = $2\n           RETURNING flags",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flags",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "mail",
+            "name": "flags"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2de79c07acf9bdb7bc35a995dc5885b88b28ebbf9a2859fa7d7b079e9308deae"
+}

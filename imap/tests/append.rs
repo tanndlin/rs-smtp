@@ -116,6 +116,16 @@ async fn append_accepts_flags_and_date_time() {
         resp.contains("a2 OK") && resp.contains("APPEND completed"),
         "expected tagged OK completion: {resp:?}"
     );
+
+    stream.write_all(b"a3 SELECT INBOX\r\n").unwrap();
+    let _ = read_available(&mut stream);
+    stream.write_all(b"a4 FETCH 1 FLAGS\r\n").unwrap();
+    let resp = read_available(&mut stream);
+
+    assert!(
+        resp.contains("* 1 FETCH (FLAGS (\\Seen \\Draft))"),
+        "expected the APPENDed flags to be stored: {resp:?}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
