@@ -7,6 +7,7 @@ pub enum Response {
     Closing,
     StartMailInput,
     Unrecognized,
+    BadSequence,
 }
 
 impl EncodeTo for Response {
@@ -17,6 +18,7 @@ impl EncodeTo for Response {
             Response::Closing => buf.extend_from_slice(b"221 rs-smtp v0.1 closing channel"),
             Response::StartMailInput => buf.extend_from_slice(b"354 start mail input"),
             Response::Unrecognized => buf.extend_from_slice(b"500 5.5.1 Command unrecognized"),
+            Response::BadSequence => buf.extend_from_slice(b"503 5.5.1 Bad sequence of commands"),
         }
 
         buf.extend_from_slice(b"\r\n");

@@ -5,11 +5,20 @@ use crate::smtp::{
     },
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Init,
+    Greeted,
+    MailFrom,
+    RcptTo,
+    Data,
+}
+
 pub struct SMTPState {
+    phase: Phase,
     domain: Option<String>,
     from: Option<String>,
     recipient: Vec<String>,
-    pub receiving_data: bool, // Whether we are receiving data from client
     data: Vec<String>,
     received_callback: Box<dyn FnMut(Email)>,
 }
@@ -17,16 +26,27 @@ pub struct SMTPState {
 impl SMTPState {
     pub fn new(received_callback: impl FnMut(Email) + 'static) -> Self {
         Self {
+            phase: Phase::Init,
             domain: None,
             from: None,
             recipient: vec![],
-            receiving_data: false,
             data: Vec::new(),
             received_callback: Box::new(received_callback),
         }
     }
 
-    pub fn handle_data_content(&mut self, data: &str) -> Option<Response> {
+    pub fn handle_line(&mut self, line: &str) -> Option<Response> {
+        if self.phase == Phase::Data {
+            return self.handle_data_content(line);
+        }
+
+        Some(match Request::try_from(line) {
+            Ok(command) => self.handle_message(command),
+            Err(_) => Response::Unrecognized,
+        })
+    }
+
+    fn handle_data_content(&mut self, data: &str) -> Option<Response> {
         if data == ".\r\n" {
             let email = Email::from(&*self);
             (self.received_callback)(email);
@@ -40,7 +60,7 @@ impl SMTPState {
         None
     }
 
-    pub fn handle_message(&mut self, message: Request) -> Response {
+    fn handle_message(&mut self, message: Request) -> Response {
         match message {
             Request::Hello(helo) => self.handle_hello(helo),
             Request::EHello(ehlo) => self.handle_extended_hello(ehlo),
@@ -53,40 +73,61 @@ impl SMTPState {
         }
     }
 
+    fn reset_transaction(&mut self) {
+        self.from = None;
+        self.recipient.clear();
+        self.data.clear();
+        if self.phase != Phase::Init {
+            self.phase = Phase::Greeted;
+        }
+    }
+
     fn handle_reset(&mut self) -> Response {
         self.reset_transaction();
         Response::Ok
     }
 
-    fn reset_transaction(&mut self) {
-        self.from = None;
-        self.recipient.clear();
-        self.data.clear();
-        self.receiving_data = false;
+    fn greet(&mut self, domain: String) -> Response {
+        self.domain = Some(domain);
+        self.reset_transaction();
+        self.phase = Phase::Greeted;
+        Response::Ok
     }
 
     fn handle_extended_hello(&mut self, ehlo: ExtendedHelloMessage) -> Response {
-        self.domain = Some(ehlo.domain);
-        Response::Ok
+        self.greet(ehlo.domain)
     }
 
     fn handle_hello(&mut self, helo: HelloMessage) -> Response {
-        self.domain = Some(helo.domain);
-        Response::Ok
+        self.greet(helo.domain)
     }
 
     fn handle_mail(&mut self, mail: MailMessage) -> Response {
+        if self.phase != Phase::Greeted {
+            return Response::BadSequence;
+        }
+
         self.from = Some(mail.from);
+        self.phase = Phase::MailFrom;
         Response::Ok
     }
 
     fn handle_recipient(&mut self, mail: RecipientMessage) -> Response {
+        if !matches!(self.phase, Phase::MailFrom | Phase::RcptTo) {
+            return Response::BadSequence;
+        }
+
         self.recipient.push(mail.to);
+        self.phase = Phase::RcptTo;
         Response::Ok
     }
 
     fn handle_data_command(&mut self) -> Response {
-        self.receiving_data = true;
+        if self.phase != Phase::RcptTo {
+            return Response::BadSequence;
+        }
+
+        self.phase = Phase::Data;
         Response::StartMailInput
     }
 }

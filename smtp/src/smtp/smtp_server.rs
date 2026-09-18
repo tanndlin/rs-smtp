@@ -10,7 +10,7 @@ use amiquip::{AmqpProperties, AmqpValue, Channel, Connection, Exchange, Publish}
 use crate::{
     smtp::{
         email::Email,
-        message::{Ready, Request, Response},
+        message::{Ready, Response},
         smtp_state::SMTPState,
     },
     util::line_parser::LineParser,
@@ -60,26 +60,21 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: &Arc<Mute
     let ready = Response::Ready(Ready::new());
     ready.write_to(&mut stream).unwrap();
 
-    while let Ok(message) = line_parser.next_line() {
-        if !state.receiving_data {
-            // An unrecognized verb must not take down the connection thread —
-            // reply 500 and keep going (Gmail & other MTAs send RSET/NOOP/etc).
-            let response = match Request::try_from(message) {
-                Ok(command) => state.handle_message(command),
-                Err(e) => {
-                    println!("[{addr}] {e}");
-                    Response::Unrecognized
-                }
-            };
+    while let Ok(line) = line_parser.next_line() {
+        let Some(response) = state.handle_line(&line) else {
+            continue;
+        };
 
-            if matches!(response, Response::Closing) {
-                response.write_to(&mut stream).unwrap();
-                break;
-            }
+        match response {
+            Response::Unrecognized => println!("[{addr}] Unknown command: {}", line.trim_end()),
+            Response::BadSequence => println!("[{addr}] Out of sequence: {}", line.trim_end()),
+            _ => {}
+        }
 
-            response.write_to(&mut stream).unwrap();
-        } else if let Some(res) = state.handle_data_content(&message) {
-            res.write_to(&mut stream).unwrap();
+        let closing = matches!(response, Response::Closing);
+        response.write_to(&mut stream).unwrap();
+        if closing {
+            break;
         }
     }
 

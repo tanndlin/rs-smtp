@@ -13,11 +13,11 @@ pub enum Request {
     Quit,
 }
 
-impl TryFrom<String> for Request {
+impl TryFrom<&str> for Request {
     type Error = String;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        let (command, rest) = value.split_once(' ').unwrap_or((value.as_str().trim(), ""));
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let (command, rest) = value.split_once(' ').unwrap_or((value.trim(), ""));
         Ok(match command {
             "HELO" => Request::Hello(HelloMessage::from(rest)),
             "EHLO" => Request::EHello(ExtendedHelloMessage::from(rest)),
