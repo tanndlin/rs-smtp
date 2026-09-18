@@ -316,3 +316,19 @@ async fn store_before_login_is_rejected() {
         "expected a tagged BAD before login: {resp:?}"
     );
 }
+
+/// STATUS DELETED counts the messages a STORE marked `\Deleted`, and UNSEEN
+/// the ones without `\Seen`.
+#[tokio::test(flavor = "multi_thread")]
+async fn status_counts_flags_set_by_store() {
+    let server = start_server().await;
+    let mut stream = login_with_messages(&server).await;
+
+    send(&mut stream, "a4 STORE 3 +FLAGS.SILENT (\\Deleted)\r\n");
+    let resp = send(&mut stream, "a5 STATUS INBOX (UNSEEN DELETED)\r\n");
+
+    assert!(
+        resp.contains("UNSEEN 1") && resp.contains("DELETED 1"),
+        "expected one unseen and one deleted message: {resp:?}"
+    );
+}

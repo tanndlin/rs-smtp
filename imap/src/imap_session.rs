@@ -291,7 +291,7 @@ impl IMAPSession {
         let deleted = if cmd.deleted {
             Some(
                 sqlx::query_scalar!(
-                    "SELECT COUNT(*) FROM mail WHERE NOT ($1 = ANY(flags))",
+                    "SELECT COUNT(*) FROM mail WHERE $1 = ANY(flags)",
                     "\\Deleted"
                 )
                 .fetch_one(&*self.db_pool)
