@@ -1,0 +1,3 @@
+# `cargo sqlx prepare` writes LF; keep the checkout LF too so regenerating the
+# cache only shows the queries that actually changed.
+.sqlx/*.json text eol=lf
