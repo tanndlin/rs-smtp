@@ -4,7 +4,7 @@ use std::{
     net::{SocketAddr, TcpListener, TcpStream},
     path::Path,
     sync::{Arc, Mutex, PoisonError},
-    thread::{self, JoinHandle},
+    thread::{self},
 };
 
 use amiquip::{AmqpProperties, AmqpValue, Channel, Connection, Exchange, Publish};
@@ -20,35 +20,30 @@ use crate::{
 use util::EncodeTo;
 
 pub struct SMTPServer {
-    listen_thread: JoinHandle<()>,
+    addr: SocketAddr,
+    connection: Arc<Mutex<Connection>>,
 }
 
 impl SMTPServer {
-    pub fn new(addr: SocketAddr, connection: Arc<Mutex<Connection>>) -> Result<Self, String> {
-        let listener =
-            TcpListener::bind(addr).map_err(|e| format!("Error creating tcp listener {e}"))?;
+    pub fn new(addr: SocketAddr, connection: Arc<Mutex<Connection>>) -> Self {
+        Self { addr, connection }
+    }
 
-        println!("Listening on {addr}");
-        let listen_thread = thread::spawn(move || listen(&listener, &connection));
-
+    pub fn listen(self) -> Result<!, String> {
         let mail_dir = Path::new("mail");
         if !mail_dir.exists() {
             fs::create_dir(mail_dir).unwrap();
         }
 
-        Ok(Self { listen_thread })
-    }
+        let listener =
+            TcpListener::bind(self.addr).map_err(|e| format!("Error creating tcp listener {e}"))?;
+        println!("Listening on {}", self.addr);
 
-    pub fn join(self) {
-        self.listen_thread.join().unwrap();
-    }
-}
-
-fn listen(listener: &TcpListener, connection: &Arc<Mutex<Connection>>) {
-    loop {
-        let (stream, addr) = listener.accept().unwrap();
-        let connection = connection.clone();
-        thread::spawn(move || handle_request(stream, addr, &connection));
+        loop {
+            let (stream, addr) = listener.accept().unwrap();
+            let connection = self.connection.clone();
+            thread::spawn(move || handle_request(stream, addr, &connection));
+        }
     }
 }
 
