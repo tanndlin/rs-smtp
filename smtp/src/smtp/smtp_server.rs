@@ -30,11 +30,6 @@ impl SMTPServer {
     }
 
     pub fn listen(self) -> Result<!, String> {
-        let mail_dir = Path::new("mail");
-        if !mail_dir.exists() {
-            fs::create_dir(mail_dir).unwrap();
-        }
-
         let listener =
             TcpListener::bind(self.addr).map_err(|e| format!("Error creating tcp listener {e}"))?;
         println!("Listening on {}", self.addr);
