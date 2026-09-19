@@ -1,5 +1,6 @@
 mod append_ok_response;
 mod capability_response;
+mod check_response;
 mod continuation_response;
 mod create_response;
 mod fetch_response;
@@ -16,6 +17,7 @@ mod status_response;
 
 pub use append_ok_response::AppendOkResponse;
 pub use capability_response::CapabilityResponse;
+pub use check_response::CheckResponse;
 pub use continuation_response::ContinuationResponse;
 pub use create_response::CreateResponse;
 pub use fetch_response::{FetchMessageResponse, FetchResponse};

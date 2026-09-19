@@ -1,5 +1,6 @@
 mod append_command;
 mod capability_command;
+mod check_command;
 mod client_command;
 mod create_command;
 mod fetch_command;
@@ -16,6 +17,7 @@ mod uid_command;
 
 pub use append_command::AppendCommand;
 pub use capability_command::CapabilityCommand;
+pub use check_command::CheckCommand;
 pub use client_command::{ClientCommand, ClientCommandTrait};
 pub use create_command::CreateCommand;
 pub use fetch_command::{

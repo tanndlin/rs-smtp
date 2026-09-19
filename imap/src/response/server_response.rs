@@ -1,7 +1,7 @@
 use crate::response::{
-    AppendOkResponse, CapabilityResponse, ContinuationResponse, CreateResponse, FetchResponse,
-    ListResponse, LoginResponse, LogoutResponse, LsubResponse, NoopResponse, SelectResponse,
-    ServerErrorResponse, StatusResponse,
+    AppendOkResponse, CapabilityResponse, CheckResponse, ContinuationResponse, CreateResponse,
+    FetchResponse, ListResponse, LoginResponse, LogoutResponse, LsubResponse, NoopResponse,
+    SelectResponse, ServerErrorResponse, StatusResponse,
 };
 use util::EncodeTo;
 
@@ -20,6 +20,7 @@ pub enum ServerResponse {
     Fetch(FetchResponse),
     Create(CreateResponse),
     Noop(NoopResponse),
+    Check(CheckResponse),
 }
 
 impl EncodeTo for ServerResponse {
@@ -38,6 +39,7 @@ impl EncodeTo for ServerResponse {
             ServerResponse::Fetch(res) => res.encode_to(buf),
             ServerResponse::Create(res) => res.encode_to(buf),
             ServerResponse::Noop(res) => res.encode_to(buf),
+            ServerResponse::Check(res) => res.encode_to(buf),
         }
     }
 }

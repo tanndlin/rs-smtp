@@ -4,14 +4,14 @@ use sqlx::{Pool, Postgres, types::chrono::Utc};
 
 use crate::{
     command::{
-        AppendCommand, BodyFetchable, ClientCommand, ClientCommandTrait, CreateCommand,
-        FetchCommand, Fetchable, ListCommand, LogoutCommand, LsubCommand, SelectCommand, Sequence,
-        StatusCommand, StoreCommand, UIDCommand, UIDCommandType,
+        AppendCommand, BodyFetchable, CheckCommand, ClientCommand, ClientCommandTrait,
+        CreateCommand, FetchCommand, Fetchable, ListCommand, LogoutCommand, LsubCommand,
+        SelectCommand, Sequence, StatusCommand, StoreCommand, UIDCommand, UIDCommandType,
     },
     cursor::Cursor,
     handle_fetch::get_fetchable,
     response::{
-        AppendOkResponse, CapabilityResponse, ContinuationResponse, CreateResponse,
+        AppendOkResponse, CapabilityResponse, CheckResponse, ContinuationResponse, CreateResponse,
         FetchMessageResponse, FetchResponse, Greeting, ListResponse, LoginResponse, LoginResult,
         LogoutResponse, LsubResponse, MailboxListEntry, NoopResponse, SelectResponse,
         ServerErrorReason, ServerErrorResponse, ServerResponse, ServerResponseTrait,
@@ -144,6 +144,9 @@ impl IMAPSession {
                 ClientCommand::Store(cmd) => {
                     cmd.protocol_violation("Not authorized".to_string()).into()
                 }
+                ClientCommand::Check(cmd) => {
+                    cmd.protocol_violation("Not authorized".to_string()).into()
+                }
             },
             SessionState::Authenticated => match command {
                 ClientCommand::List(cmd) => self.handle_list_command(cmd),
@@ -162,6 +165,7 @@ impl IMAPSession {
                     self.handle_store_command(cmd, Addressing::BySeq).await
                 }
                 ClientCommand::Noop(noop_command) => NoopResponse::respond_to(noop_command).into(),
+                ClientCommand::Check(cmd) => self.handle_check_command(cmd),
                 ClientCommand::StartTLS(_) | ClientCommand::Login(_) => {
                     todo!("This should return an error")
                 }
@@ -173,6 +177,15 @@ impl IMAPSession {
     fn handle_logout_command(&mut self, cmd: LogoutCommand) -> ServerResponse {
         self.auth_state = SessionState::Logout;
         LogoutResponse::respond_to(cmd).into()
+    }
+
+    fn handle_check_command(&self, cmd: CheckCommand) -> ServerResponse {
+        if self.selected_mailbox.is_none() {
+            return cmd
+                .protocol_violation("No mailbox selected".to_string())
+                .into();
+        }
+        CheckResponse::respond_to(cmd).into()
     }
 
     fn handle_list_command(&mut self, cmd: ListCommand) -> ServerResponse {
