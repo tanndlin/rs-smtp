@@ -1,5 +1,6 @@
 use std::{
     collections::BTreeMap,
+    convert::Infallible,
     net::{SocketAddr, TcpListener, TcpStream},
     sync::{Arc, Mutex, PoisonError},
     thread::{self},
@@ -27,7 +28,7 @@ impl SMTPServer {
         Self { addr, connection }
     }
 
-    pub fn listen(self) -> Result<!, String> {
+    pub fn listen(self) -> Result<Infallible, String> {
         let listener =
             TcpListener::bind(self.addr).map_err(|e| format!("Error creating tcp listener {e}"))?;
         println!("Listening on {}", self.addr);
