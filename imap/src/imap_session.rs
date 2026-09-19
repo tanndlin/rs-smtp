@@ -18,7 +18,7 @@ use crate::{
         StatusResponse,
     },
 };
-use util::Email;
+use util::{Email, Mailbox};
 
 pub struct IMAPSession {
     db_pool: Arc<Pool<Postgres>>,
@@ -198,14 +198,13 @@ impl IMAPSession {
 
     async fn handle_select_command(&mut self, cmd: SelectCommand) -> ServerResponse {
         assert!(cmd.mailbox == "INBOX");
-        let mailbox_id =
-            sqlx::query_scalar!("SELECT id FROM mailboxes WHERE name = $1", &cmd.mailbox)
-                .fetch_one(&*self.db_pool)
-                .await
-                .expect("Failed to fetch mailbox for id");
+        let mailbox = Mailbox::fetch(&*self.db_pool, &cmd.mailbox)
+            .await
+            .expect("Failed to look up mailbox")
+            .expect("Selected mailbox does not exist");
         self.selected_mailbox = Some(SelectedMailbox {
-            id: mailbox_id,
-            name: cmd.mailbox.clone(),
+            id: mailbox.id,
+            name: mailbox.name,
         });
 
         let exists: usize = sqlx::query_scalar!("SELECT COUNT(*) FROM mail")
@@ -221,13 +220,7 @@ impl IMAPSession {
             .unwrap_or(0);
         let next_uid = max_id as u64 + 1;
 
-        let validity_uid = sqlx::query_scalar!(
-            "SELECT uid_validity FROM mailboxes WHERE name = $1",
-            self.selected_mailbox.as_ref().unwrap().name
-        )
-        .fetch_one(&*self.db_pool)
-        .await
-        .unwrap() as u64;
+        let validity_uid = mailbox.uid_validity as u64;
 
         SelectResponse::new(cmd, exists, next_uid, validity_uid).into()
     }
@@ -339,12 +332,11 @@ impl IMAPSession {
                     Addressing::ByUid => row.uid as u64,
                 };
 
-                Sequence::set_contains(sequences, n, last)
-                    .then_some(MessageRef {
-                        id: row.id,
-                        seqnum,
-                        uid: row.uid,
-                    })
+                Sequence::set_contains(sequences, n, last).then_some(MessageRef {
+                    id: row.id,
+                    seqnum,
+                    uid: row.uid,
+                })
             })
             .collect()
     }
@@ -398,8 +390,7 @@ impl IMAPSession {
 
     async fn handle_append_command(&mut self, mut cmd: AppendCommand) -> ServerResponse {
         // Check if the mailbox exists
-        let mailbox = sqlx::query!("SELECT name FROM mailboxes WHERE name = $1", cmd.mailbox)
-            .fetch_optional(&*self.db_pool)
+        let mailbox = Mailbox::fetch(&*self.db_pool, &cmd.mailbox)
             .await
             .expect("Failed to look up mailbox");
         if mailbox.is_none() {
@@ -439,17 +430,12 @@ impl IMAPSession {
             .await
             .expect("failed to open APPEND transaction");
 
-        let allocated = sqlx::query!(
-            "UPDATE mailboxes SET uid_next = uid_next + 1 WHERE name = $1 \
-             RETURNING (uid_next - 1) AS \"uid!\", uid_validity",
-            cmd.mailbox,
-        )
-        .fetch_one(&mut *tx)
-        .await
-        .expect("failed to allocate APPEND uid");
+        let (uid, uid_validity) = Mailbox::allocate_uid(&mut *tx, &cmd.mailbox)
+            .await
+            .expect("failed to allocate APPEND uid");
 
         email
-            .insert(&mut *tx, &cmd.mailbox, allocated.uid)
+            .insert(&mut *tx, &cmd.mailbox, uid)
             .await
             .expect("failed to insert appended message");
 
@@ -457,7 +443,7 @@ impl IMAPSession {
             .await
             .expect("failed to commit appended message");
 
-        (allocated.uid_validity as u32, allocated.uid as u32)
+        (uid_validity as u32, uid as u32)
     }
 
     async fn handle_uid(&self, cmd: UIDCommand) -> ServerResponse {
@@ -496,8 +482,7 @@ impl IMAPSession {
 
     async fn handle_create_command(&self, cmd: CreateCommand) -> ServerResponse {
         // Check if the mailbox exists
-        let mailbox = sqlx::query!("SELECT name FROM mailboxes WHERE name = $1", cmd.mailbox)
-            .fetch_optional(&*self.db_pool)
+        let mailbox = Mailbox::fetch(&*self.db_pool, &cmd.mailbox)
             .await
             .expect("Failed to look up mailbox");
         if mailbox.is_some() {
@@ -507,15 +492,11 @@ impl IMAPSession {
             });
         }
 
-        let uid_validity = sqlx::query_scalar!(
-            "INSERT INTO mailboxes (name, uid_validity, uid_next) VALUES ($1, 1, 1) RETURNING uid_validity",
-            cmd.mailbox
-        )
-        .fetch_one(&*self.db_pool)
-        .await
-        .expect("Failed to create mailbox");
+        let mailbox = Mailbox::create(&*self.db_pool, &cmd.mailbox)
+            .await
+            .expect("Failed to create mailbox");
 
-        CreateResponse::new(cmd.tag, uid_validity as u32).into()
+        CreateResponse::new(cmd.tag, mailbox.uid_validity as u32).into()
     }
 
     async fn handle_store_command(

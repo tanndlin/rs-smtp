@@ -2,7 +2,7 @@ use futures_lite::stream::StreamExt;
 use lapin::{Connection, ConnectionProperties, options::*, types::FieldTable};
 use sqlx::{postgres::PgPoolOptions, types::chrono};
 
-use util::Email;
+use util::{Email, Mailbox};
 
 #[tokio::main]
 async fn main() {
@@ -95,13 +95,7 @@ async fn main() {
         println!("{}", email.body_text.as_deref().unwrap_or_default());
 
         let mut tx = db_pool.begin().await.unwrap();
-        let uid = sqlx::query_scalar!(
-            "UPDATE mailboxes SET uid_next = uid_next + 1 WHERE name = $1 RETURNING (uid_next - 1) AS \"uid!\"",
-            "INBOX",
-        )
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
+        let (uid, _) = Mailbox::allocate_uid(&mut *tx, "INBOX").await.unwrap();
 
         match email.insert(&mut *tx, "INBOX", uid).await {
             Ok(()) => {
