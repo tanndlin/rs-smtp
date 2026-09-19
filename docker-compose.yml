@@ -4,7 +4,8 @@ services:
   consumer:
     build:
       context: .
-      dockerfile: consumer/Dockerfile
+      dockerfile: Dockerfile
+      target: consumer
     container_name: tmail-consumer
     depends_on:
       db:
@@ -73,7 +74,8 @@ services:
   imap:
     build:
       context: .
-      dockerfile: imap/Dockerfile
+      dockerfile: Dockerfile
+      target: imap
     container_name: tmail-imap-server
     depends_on:
       db:
@@ -105,7 +107,8 @@ services:
   smtp:
     build:
       context: .
-      dockerfile: smtp/Dockerfile
+      dockerfile: Dockerfile
+      target: smtp
     container_name: tmail-smtp
     depends_on:
       db:
