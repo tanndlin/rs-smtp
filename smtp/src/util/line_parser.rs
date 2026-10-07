@@ -3,7 +3,7 @@ use std::{io::Read, net::TcpStream};
 pub struct LineParser {
     stream: TcpStream,
     buf: Vec<u8>,
-    read_buf: [u8; 4096],
+    read_buf: Box<[u8]>,
 }
 
 impl LineParser {
@@ -11,7 +11,7 @@ impl LineParser {
         Self {
             stream,
             buf: vec![],
-            read_buf: [0; 4096],
+            read_buf: vec![0; 32768].into_boxed_slice(),
         }
     }
 

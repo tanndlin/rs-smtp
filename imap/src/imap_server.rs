@@ -51,7 +51,8 @@ async fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Po
     stream.write_all(&res.to_bytes()).await.unwrap();
 
     let mut bytes = vec![];
-    let mut buf = [0; 4096];
+    let mut buf = vec![0; 32768].into_boxed_slice();
+    // TODO: Support messages larger than 32KB
     while let Ok(bytes_read) = stream.read(&mut buf).await
         && bytes_read > 0
     {
