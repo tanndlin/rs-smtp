@@ -103,6 +103,12 @@ impl Drop for TestServer {
 /// Create a fresh database, run the migrations into it, bind the server to an
 /// OS-assigned loopback port, and run its accept loop on a background task.
 pub async fn start_server() -> TestServer {
+    start_server_with_pool_size(5).await
+}
+
+/// [`start_server`] with the server's Postgres pool capped at `max_connections`
+/// instead of the small default the tests get by with.
+pub async fn start_server_with_pool_size(max_connections: u32) -> TestServer {
     let admin = base_connect_options().database("postgres");
     let db_name = unique_db_name();
 
@@ -117,7 +123,7 @@ pub async fn start_server() -> TestServer {
     conn.close().await.ok();
 
     let pool = PgPoolOptions::new()
-        .max_connections(5)
+        .max_connections(max_connections)
         .connect_with(base_connect_options().database(&db_name))
         .await
         .expect("failed to connect to test database");

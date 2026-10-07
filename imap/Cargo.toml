@@ -14,3 +14,10 @@ sqlx = { version = "0.9.0", features = [
     "macros",
     "migrate",
 ] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["net", "io-util", "sync", "time"] }
+
+[[bench]]
+name = "client_read"
+harness = false
