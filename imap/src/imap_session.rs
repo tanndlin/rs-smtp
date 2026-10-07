@@ -90,9 +90,9 @@ impl IMAPSession {
 
         match ClientCommand::parse_bytes(buf) {
             Ok((command, read)) => {
-                dbg!(&command);
+                // dbg!(&command);
                 let res = self.handle_command(command).await;
-                dbg!(&res);
+                // dbg!(&res);
                 Ok((res, read))
             }
             Err(e) => Err(e.into()),

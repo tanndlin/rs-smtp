@@ -107,8 +107,6 @@ impl FromStr for FetchIndicator {
             return Ok(Self::Wild);
         }
 
-        dbg!(&s);
-
         Ok(FetchIndicator::Index(s.parse()?))
     }
 }

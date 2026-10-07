@@ -55,7 +55,7 @@ async fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Po
     while let Ok(bytes_read) = stream.read(&mut buf).await
         && bytes_read > 0
     {
-        println!("Read {bytes_read} bytes");
+        // println!("Read {bytes_read} bytes");
         bytes.extend_from_slice(&buf[..bytes_read]);
 
         while bytes.windows(2).any(|window| window == b"\r\n") {
