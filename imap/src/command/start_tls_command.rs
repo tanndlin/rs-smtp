@@ -8,7 +8,7 @@ pub struct StartTLSCommand {
 }
 
 impl ClientCommandTrait for StartTLSCommand {
-    fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
+    fn parse_bytes(_tag: String, _cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         todo!()
     }
 }

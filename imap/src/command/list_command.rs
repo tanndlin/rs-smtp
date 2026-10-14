@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn reference_name_wildcard_throws() {
-        let Err(e) = ClientCommand::parse_bytes(b"A101 LIST * ~/Mail/foo\r\n") else {
+        let Err(_) = ClientCommand::parse_bytes(b"A101 LIST * ~/Mail/foo\r\n") else {
             panic!()
         };
     }

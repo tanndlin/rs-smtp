@@ -28,7 +28,7 @@ pub struct IMAPSession {
 }
 
 pub struct SelectedMailbox {
-    id: i32,
+    _id: i32,
     name: String,
 }
 
@@ -188,7 +188,7 @@ impl IMAPSession {
             .expect("Failed to look up mailbox")
             .expect("Selected mailbox does not exist");
         self.selected_mailbox = Some(SelectedMailbox {
-            id: mailbox.id,
+            _id: mailbox.id,
             name: mailbox.name,
         });
 
@@ -462,7 +462,7 @@ impl IMAPSession {
                 self.handle_store_command(store_cmd, Addressing::ByUid)
                     .await
             }
-            UIDCommandType::Copy { sequences, mailbox } => {
+            UIDCommandType::Copy { .. } => {
                 todo!();
             }
         }
