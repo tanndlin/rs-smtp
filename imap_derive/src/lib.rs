@@ -97,6 +97,7 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let mut parse_bytes_arms = Vec::new();
     let mut tag_arms = Vec::new();
     let mut allowed_arms = Vec::new();
+    let mut keyword_arms = Vec::new();
     for (variant, ty) in wrapping_variants(input, "ImapCommands")? {
         let ident = &variant.ident;
 
@@ -144,6 +145,10 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                 #(crate::imap_session::SessionState::#states)|*
             ),
         });
+
+        keyword_arms.push(quote! {
+            #name::#ident(_) => #keyword,
+        });
     }
 
     Ok(quote! {
@@ -178,6 +183,13 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             pub fn tag(&self) -> &str {
                 match self {
                     #(#tag_arms)*
+                }
+            }
+
+            /// The IMAP command name this was parsed from, e.g. `"FETCH"`.
+            pub fn keyword(&self) -> &'static str {
+                match self {
+                    #(#keyword_arms)*
                 }
             }
         }

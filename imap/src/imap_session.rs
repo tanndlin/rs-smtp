@@ -106,9 +106,8 @@ impl IMAPSession {
             _ => {}
         }
         if !command.allowed_in(self.auth_state) {
-            return command
-                .protocol_violation("Command not allowed in this state".to_string())
-                .into();
+            let reason = format!("{} not allowed in this state", command.keyword());
+            return command.protocol_violation(reason).into();
         }
 
         match command {
