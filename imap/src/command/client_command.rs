@@ -8,7 +8,7 @@ use crate::{
     },
     cursor::Cursor,
     errors::CommandParseError,
-    response::{ServerErrorReason, ServerErrorResponse},
+    response::ServerErrorResponse,
 };
 
 #[derive(Debug, ImapCommands)]
@@ -41,17 +41,14 @@ impl ClientCommand {
         let bytes_read = cursor.pos;
         Ok((cmd, bytes_read))
     }
+
+    pub fn protocol_violation(&self, reason: String) -> ServerErrorResponse {
+        ServerErrorResponse::protocol_violation(self.tag().to_string(), reason)
+    }
 }
 
 pub trait ClientCommandTrait: Sized {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError>;
-    fn tag(&self) -> &str;
-    fn protocol_violation(self, reason: String) -> ServerErrorResponse {
-        ServerErrorResponse {
-            tag: Some(self.tag().to_string()),
-            reason: ServerErrorReason::ProtocolViolation(reason),
-        }
-    }
 }
 
 #[cfg(test)]

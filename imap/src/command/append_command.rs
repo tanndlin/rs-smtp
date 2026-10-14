@@ -69,10 +69,6 @@ impl ClientCommandTrait for AppendCommand {
             message,
         })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 /// Parse an IMAP `date-time` argument - `"[ ]d-Mon-yyyy HH:MM:SS +ZZZZ"`, quotes

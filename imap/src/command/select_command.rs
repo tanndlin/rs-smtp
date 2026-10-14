@@ -16,10 +16,6 @@ impl ClientCommandTrait for SelectCommand {
 
         Ok(Self { tag, mailbox })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 #[cfg(test)]

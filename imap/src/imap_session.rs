@@ -4,9 +4,9 @@ use sqlx::{Pool, Postgres, types::chrono::Utc};
 
 use crate::{
     command::{
-        AppendCommand, BodyFetchable, CheckCommand, ClientCommand, ClientCommandTrait,
-        CreateCommand, FetchCommand, Fetchable, ListCommand, LogoutCommand, LsubCommand,
-        SelectCommand, Sequence, StatusCommand, StoreCommand, UIDCommand, UIDCommandType,
+        AppendCommand, BodyFetchable, CheckCommand, ClientCommand, CreateCommand, FetchCommand,
+        Fetchable, ListCommand, LogoutCommand, LsubCommand, SelectCommand, Sequence, StatusCommand,
+        StoreCommand, UIDCommand, UIDCommandType,
     },
     cursor::Cursor,
     handle_fetch::get_fetchable,
@@ -117,34 +117,16 @@ impl IMAPSession {
                 }
                 ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
                 ClientCommand::Noop(noop_command) => NoopResponse::respond_to(noop_command).into(),
-                ClientCommand::List(cmd) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-                ClientCommand::Lsub(cmd) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-                ClientCommand::Select(cmd) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-                ClientCommand::Status(cmd) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-                ClientCommand::Fetch(cmd) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-                ClientCommand::Append(cmd) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-                ClientCommand::UID(cmd) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-                ClientCommand::Create(cmd) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-                ClientCommand::Store(cmd) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-                ClientCommand::Check(cmd) => {
+                cmd @ (ClientCommand::List(_)
+                | ClientCommand::Lsub(_)
+                | ClientCommand::Select(_)
+                | ClientCommand::Status(_)
+                | ClientCommand::Fetch(_)
+                | ClientCommand::Append(_)
+                | ClientCommand::UID(_)
+                | ClientCommand::Create(_)
+                | ClientCommand::Store(_)
+                | ClientCommand::Check(_)) => {
                     cmd.protocol_violation("Not authorized".to_string()).into()
                 }
             },
@@ -181,9 +163,11 @@ impl IMAPSession {
 
     fn handle_check_command(&self, cmd: CheckCommand) -> ServerResponse {
         if self.selected_mailbox.is_none() {
-            return cmd
-                .protocol_violation("No mailbox selected".to_string())
-                .into();
+            return ServerErrorResponse::protocol_violation(
+                cmd.tag,
+                "No mailbox selected".to_string(),
+            )
+            .into();
         }
         CheckResponse::respond_to(cmd).into()
     }

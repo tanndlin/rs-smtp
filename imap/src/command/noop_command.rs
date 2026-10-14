@@ -13,8 +13,4 @@ impl ClientCommandTrait for NoopCommand {
 
         Ok(NoopCommand { tag })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }

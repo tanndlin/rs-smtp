@@ -13,8 +13,4 @@ impl ClientCommandTrait for CheckCommand {
 
         Ok(CheckCommand { tag })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }

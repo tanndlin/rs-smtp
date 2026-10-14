@@ -12,10 +12,6 @@ impl ClientCommandTrait for CapabilityCommand {
         cursor.expect_crlf()?;
         Ok(Self { tag })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 #[cfg(test)]

@@ -16,6 +16,13 @@ pub enum ServerErrorReason {
 }
 
 impl ServerErrorResponse {
+    pub fn protocol_violation(tag: String, reason: String) -> Self {
+        Self {
+            tag: Some(tag),
+            reason: ServerErrorReason::ProtocolViolation(reason),
+        }
+    }
+
     fn tag_str(&self) -> String {
         self.tag.to_owned().unwrap_or("*".to_string())
     }

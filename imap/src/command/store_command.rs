@@ -24,10 +24,6 @@ impl ClientCommandTrait for StoreCommand {
             store,
         })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 #[cfg(test)]

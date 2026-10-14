@@ -41,10 +41,6 @@ impl ClientCommandTrait for StatusCommand {
             size,
         })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 #[cfg(test)]

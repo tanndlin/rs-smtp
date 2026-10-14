@@ -22,10 +22,6 @@ impl ClientCommandTrait for LsubCommand {
             mailbox,
         })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 #[cfg(test)]

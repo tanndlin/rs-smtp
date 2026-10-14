@@ -12,8 +12,4 @@ impl ClientCommandTrait for LogoutCommand {
         cursor.expect_crlf()?;
         Ok(Self { tag })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }

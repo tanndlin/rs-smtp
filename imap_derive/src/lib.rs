@@ -1,12 +1,15 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{Data, DeriveInput, Fields, Ident, LitStr, Type, Variant, parse_macro_input};
+use quote::{quote, quote_spanned};
+use syn::{
+    Data, DeriveInput, Fields, Ident, LitStr, Type, Variant, parse_macro_input, spanned::Spanned,
+};
 
 /// Derived on the `ClientCommand` enum. Each variant must wrap a single command
-/// struct implementing `ClientCommandTrait`. Generates a `From` impl per variant
-/// and a `ClientCommand::dispatch` that parses by keyword. The keyword defaults
-/// to the uppercased variant name and can be overridden with
-/// `#[imap(keyword = "...")]`.
+/// struct implementing `ClientCommandTrait` and having a `tag: String` field
+/// visible to the enum's module. Generates a `From` impl per variant, a
+/// `ClientCommand::dispatch` that parses by keyword, and a `ClientCommand::tag`
+/// accessor. The keyword defaults to the uppercased variant name and can be
+/// overridden with `#[imap(keyword = "...")]`.
 #[proc_macro_derive(ImapCommands, attributes(imap))]
 pub fn imap_commands_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -91,7 +94,8 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let name = &input.ident;
 
     let mut from_impls = Vec::new();
-    let mut arms = Vec::new();
+    let mut parse_bytes_arms = Vec::new();
+    let mut tag_arms = Vec::new();
     for (variant, ty) in wrapping_variants(input, "ImapCommands")? {
         let ident = &variant.ident;
 
@@ -108,10 +112,16 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         }
 
         from_impls.push(from_impl(name, ident, ty));
-        arms.push(quote! {
+        parse_bytes_arms.push(quote! {
             #keyword => #name::#ident(
                 <#ty as crate::command::client_command::ClientCommandTrait>::parse_bytes(tag, cursor)?,
             ),
+        });
+        // Spanned to the wrapped type so a missing or private `tag` field is
+        // reported on the variant rather than inside the macro output.
+        let tag_access = quote_spanned! {ty.span()=> &c.tag };
+        tag_arms.push(quote! {
+            #name::#ident(c) => #tag_access,
         });
     }
 
@@ -126,7 +136,7 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                 cursor: &mut crate::cursor::Cursor,
             ) -> ::core::result::Result<Self, crate::errors::CommandParseError> {
                 ::core::result::Result::Ok(match keyword {
-                    #(#arms)*
+                    #(#parse_bytes_arms)*
                     _ => {
                         return ::core::result::Result::Err(
                             crate::errors::CommandParseError::MalformedCommand(::core::option::Option::Some(
@@ -135,6 +145,12 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                         );
                     }
                 })
+            }
+
+            pub fn tag(&self) -> &str {
+                match self {
+                    #(#tag_arms)*
+                }
             }
         }
     })

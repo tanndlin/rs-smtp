@@ -22,10 +22,6 @@ impl ClientCommandTrait for ListCommand {
             mailbox,
         })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 #[cfg(test)]

@@ -604,10 +604,6 @@ impl ClientCommandTrait for FetchCommand {
             fetch_list,
         })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 #[cfg(test)]

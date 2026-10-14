@@ -251,7 +251,11 @@ async fn store_applies_to_every_message_in_the_set() {
         flags_for(&resp, 2),
         Some(set(&["\\Seen", "\\Flagged", "\\Draft"]))
     );
-    assert_eq!(flags_for(&resp, 3), None, "message 3 is not in 1:2: {resp:?}");
+    assert_eq!(
+        flags_for(&resp, 3),
+        None,
+        "message 3 is not in 1:2: {resp:?}"
+    );
     assert!(fetch_flags(&mut stream, 3).is_empty());
 }
 

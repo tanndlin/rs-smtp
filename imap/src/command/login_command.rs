@@ -18,10 +18,6 @@ impl ClientCommandTrait for LoginCommand {
 
         Ok(Self { tag, user, pass })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 #[cfg(test)]

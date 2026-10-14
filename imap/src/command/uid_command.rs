@@ -161,10 +161,6 @@ impl ClientCommandTrait for UIDCommand {
 
         Ok(Self { tag, command })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
 
 #[cfg(test)]

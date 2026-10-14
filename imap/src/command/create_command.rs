@@ -16,8 +16,4 @@ impl ClientCommandTrait for CreateCommand {
 
         Ok(CreateCommand { tag, mailbox })
     }
-
-    fn tag(&self) -> &str {
-        &self.tag
-    }
 }
