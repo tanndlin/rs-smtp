@@ -1,10 +1,7 @@
 use std::{collections::HashMap, fmt, str::FromStr};
 
 use crate::{
-    client_command_from_impl,
-    command::{ClientCommand, client_command::ClientCommandTrait},
-    cursor::Cursor,
-    errors::CommandParseError,
+    command::client_command::ClientCommandTrait, cursor::Cursor, errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -613,11 +610,10 @@ impl ClientCommandTrait for FetchCommand {
     }
 }
 
-client_command_from_impl!(FetchCommand, Fetch);
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::command::ClientCommand;
 
     fn set(buf: &[u8]) -> Vec<Sequence> {
         Sequence::parse_set(&mut Cursor::new(buf)).unwrap()

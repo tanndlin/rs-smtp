@@ -1,8 +1,5 @@
 use crate::{
-    client_command_from_impl,
-    command::client_command::{ClientCommand, ClientCommandTrait},
-    cursor::Cursor,
-    errors::CommandParseError,
+    command::client_command::ClientCommandTrait, cursor::Cursor, errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -50,11 +47,12 @@ impl ClientCommandTrait for StatusCommand {
     }
 }
 
-client_command_from_impl!(StatusCommand, Status);
-
 #[cfg(test)]
 mod tests {
-    use crate::errors::{ParseError, ParseErrorKind};
+    use crate::{
+        command::ClientCommand,
+        errors::{ParseError, ParseErrorKind},
+    };
 
     use super::*;
 

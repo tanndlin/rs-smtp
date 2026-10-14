@@ -3,8 +3,7 @@ use std::{str::FromStr, sync::Arc};
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    client_command_from_impl,
-    command::{ClientCommand, Fetchable, Sequence, client_command::ClientCommandTrait},
+    command::{Fetchable, Sequence, client_command::ClientCommandTrait},
     cursor::Cursor,
     errors::CommandParseError,
 };
@@ -168,12 +167,10 @@ impl ClientCommandTrait for UIDCommand {
     }
 }
 
-client_command_from_impl!(UIDCommand, UID);
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::FetchIndicator;
+    use crate::command::{ClientCommand, FetchIndicator};
 
     fn parse_uid(buf: &[u8]) -> UIDCommandType {
         let (cmd, _) = ClientCommand::parse_bytes(buf).unwrap();

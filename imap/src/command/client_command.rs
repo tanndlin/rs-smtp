@@ -1,3 +1,5 @@
+use imap_command_derive::ImapCommands;
+
 use crate::{
     command::{
         AppendCommand, CapabilityCommand, CheckCommand, CreateCommand, FetchCommand, ListCommand,
@@ -9,7 +11,7 @@ use crate::{
     response::{ServerErrorReason, ServerErrorResponse},
 };
 
-#[derive(Debug)]
+#[derive(Debug, ImapCommands)]
 pub enum ClientCommand {
     Capability(CapabilityCommand),
     StartTLS(StartTLSCommand),
@@ -32,30 +34,9 @@ impl ClientCommand {
     pub fn parse_bytes(buf: &[u8]) -> Result<(Self, usize), CommandParseError> {
         let mut cursor = Cursor::new(buf);
         let tag = cursor.atom()?.to_string();
-        let command_text = cursor.atom()?;
+        let command_text = cursor.atom()?.to_uppercase();
 
-        let cmd = match command_text.to_uppercase().as_str() {
-            "CAPABILITY" => CapabilityCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "STARTTLS" => StartTLSCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "LOGIN" => LoginCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "LIST" => ListCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "LSUB" => LsubCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "SELECT" => SelectCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "STATUS" => StatusCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "FETCH" => FetchCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "APPEND" => AppendCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "LOGOUT" => LogoutCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "UID" => UIDCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "CREATE" => CreateCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "NOOP" => NoopCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "STORE" => StoreCommand::parse_bytes(tag, &mut cursor)?.into(),
-            "CHECK" => CheckCommand::parse_bytes(tag, &mut cursor)?.into(),
-            _ => {
-                return Err(CommandParseError::MalformedCommand(Some(format!(
-                    "unimplemented command {command_text:?}"
-                ))));
-            }
-        };
+        let cmd = Self::dispatch(&command_text, tag, &mut cursor)?;
 
         let bytes_read = cursor.pos;
         Ok((cmd, bytes_read))
@@ -71,17 +52,6 @@ pub trait ClientCommandTrait: Sized {
             reason: ServerErrorReason::ProtocolViolation(reason),
         }
     }
-}
-
-#[macro_export]
-macro_rules! client_command_from_impl {
-    ($type: tt,$variant: ident) => {
-        impl From<$type> for ClientCommand {
-            fn from(cmd: $type) -> Self {
-                ClientCommand::$variant(cmd)
-            }
-        }
-    };
 }
 
 #[cfg(test)]

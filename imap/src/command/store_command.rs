@@ -1,6 +1,5 @@
 use crate::{
-    client_command_from_impl,
-    command::{ClientCommand, Sequence, Store, client_command::ClientCommandTrait},
+    command::{Sequence, Store, client_command::ClientCommandTrait},
     cursor::Cursor,
     errors::CommandParseError,
 };
@@ -31,12 +30,10 @@ impl ClientCommandTrait for StoreCommand {
     }
 }
 
-client_command_from_impl!(StoreCommand, Store);
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::{FetchIndicator, StoreOperation};
+    use crate::command::{ClientCommand, FetchIndicator, StoreOperation};
 
     fn parse_store(buf: &[u8]) -> StoreCommand {
         let (cmd, _) = ClientCommand::parse_bytes(buf).unwrap();

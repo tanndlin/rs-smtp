@@ -4,10 +4,7 @@
         "prefix": "client_command",
         "body": [
             "use crate::{",
-            "    client_command_from_impl,",
-            "    command::{ClientCommand, client_command::ClientCommandTrait},",
-            "    cursor::Cursor,",
-            "    errors::CommandParseError,",
+            "    command::client_command::ClientCommandTrait, cursor::Cursor, errors::CommandParseError,",
             "};",
             "",
             "#[derive(Debug)]",
@@ -25,7 +22,6 @@
             "    }",
             "}",
             "",
-            "client_command_from_impl!(${1:Name}Command, ${1:Name});",
         ]
     },
     "New Server Response": {

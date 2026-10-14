@@ -1,8 +1,5 @@
 use crate::{
-    client_command_from_impl,
-    command::{ClientCommand, client_command::ClientCommandTrait},
-    cursor::Cursor,
-    errors::CommandParseError,
+    command::client_command::ClientCommandTrait, cursor::Cursor, errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -21,5 +18,3 @@ impl ClientCommandTrait for NoopCommand {
         &self.tag
     }
 }
-
-client_command_from_impl!(NoopCommand, Noop);

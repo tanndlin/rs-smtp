@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["consumer", "imap", "smtp", "util"]
+members = ["consumer", "imap", "imap_command_derive", "smtp", "util"]
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }

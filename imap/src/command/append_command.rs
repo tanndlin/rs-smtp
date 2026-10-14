@@ -3,10 +3,7 @@ use std::fmt;
 use sqlx::types::chrono::{DateTime, Utc};
 
 use crate::{
-    client_command_from_impl,
-    command::{ClientCommand, client_command::ClientCommandTrait},
-    cursor::Cursor,
-    errors::CommandParseError,
+    command::client_command::ClientCommandTrait, cursor::Cursor, errors::CommandParseError,
 };
 
 pub struct AppendCommand {
@@ -78,8 +75,6 @@ impl ClientCommandTrait for AppendCommand {
     }
 }
 
-client_command_from_impl!(AppendCommand, Append);
-
 /// Parse an IMAP `date-time` argument - `"[ ]d-Mon-yyyy HH:MM:SS +ZZZZ"`, quotes
 /// already stripped - into a UTC instant. This becomes the message's INTERNALDATE.
 fn parse_date_time(raw: &str) -> Result<DateTime<Utc>, CommandParseError> {
@@ -93,6 +88,7 @@ fn parse_date_time(raw: &str) -> Result<DateTime<Utc>, CommandParseError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::command::ClientCommand;
 
     fn parse(buf: &[u8]) -> (AppendCommand, usize) {
         let (cmd, read) = ClientCommand::parse_bytes(buf).expect("APPEND should parse");

@@ -1,8 +1,5 @@
 use crate::{
-    client_command_from_impl,
-    command::{ClientCommand, client_command::ClientCommandTrait},
-    cursor::Cursor,
-    errors::CommandParseError,
+    command::client_command::ClientCommandTrait, cursor::Cursor, errors::CommandParseError,
 };
 
 #[derive(Debug)]
@@ -25,11 +22,9 @@ impl ClientCommandTrait for SelectCommand {
     }
 }
 
-client_command_from_impl!(SelectCommand, Select);
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::command::ClientCommand;
 
     #[test]
     fn parses_mailbox() {
