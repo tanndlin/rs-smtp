@@ -1,4 +1,4 @@
-use crate::{command::StatusCommand, response::ServerResponse};
+use crate::command::StatusCommand;
 use util::EncodeTo;
 
 #[derive(Debug)]
@@ -90,11 +90,5 @@ impl EncodeTo for StatusResponse {
 
         buf.extend_from_slice(b")\r\n");
         buf.extend_from_slice(format!("{request_tag} OK STATUS completed\r\n").as_bytes());
-    }
-}
-
-impl From<StatusResponse> for ServerResponse {
-    fn from(res: StatusResponse) -> Self {
-        ServerResponse::Status(res)
     }
 }

@@ -1,7 +1,4 @@
-use crate::{
-    command::CapabilityCommand,
-    response::{ServerResponse, server_response::ServerResponseTrait},
-};
+use crate::{command::CapabilityCommand, response::server_response::ServerResponseTrait};
 use util::EncodeTo;
 
 #[derive(Debug)]
@@ -23,11 +20,5 @@ impl EncodeTo for CapabilityResponse {
         buf.extend_from_slice(
             format!("* CAPABILITY IMAP4rev2\r\n{tag} OK CAPABILITY completed\r\n").as_bytes(),
         );
-    }
-}
-
-impl From<CapabilityResponse> for ServerResponse {
-    fn from(res: CapabilityResponse) -> Self {
-        ServerResponse::Capability(res)
     }
 }

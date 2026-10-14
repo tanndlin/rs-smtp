@@ -1,7 +1,5 @@
 use util::EncodeTo;
 
-use crate::{response::ServerResponse, server_response_from_impl};
-
 #[derive(Debug)]
 pub struct CreateResponse {
     request_tag: String,
@@ -15,8 +13,6 @@ impl CreateResponse {
         }
     }
 }
-
-server_response_from_impl!(CreateResponse, Create);
 
 impl EncodeTo for CreateResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {

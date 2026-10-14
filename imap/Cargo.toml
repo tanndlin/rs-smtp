@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 util = { path = "../util" }
-imap_command_derive = { path = "../imap_command_derive" }
+imap_derive = { path = "../imap_derive" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 sqlx = { version = "0.9.0", features = [
     "runtime-tokio",

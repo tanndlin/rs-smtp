@@ -1,6 +1,6 @@
 use util::EncodeTo;
 
-use crate::{errors::CommandParseError, response::ServerResponse};
+use crate::errors::CommandParseError;
 
 #[derive(Debug)]
 pub struct ServerErrorResponse {
@@ -33,11 +33,5 @@ impl EncodeTo for ServerErrorResponse {
                 buf.extend_from_slice(format!("{tag} NO {reason}\r\n").as_bytes())
             }
         }
-    }
-}
-
-impl From<ServerErrorResponse> for ServerResponse {
-    fn from(res: ServerErrorResponse) -> Self {
-        ServerResponse::Error(res)
     }
 }

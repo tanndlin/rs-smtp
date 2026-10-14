@@ -1,10 +1,6 @@
 use util::EncodeTo;
 
-use crate::{
-    command::LogoutCommand,
-    response::{ServerResponse, ServerResponseTrait},
-    server_response_from_impl,
-};
+use crate::{command::LogoutCommand, response::ServerResponseTrait};
 
 #[derive(Debug)]
 pub struct LogoutResponse {
@@ -18,8 +14,6 @@ impl ServerResponseTrait<LogoutCommand> for LogoutResponse {
         }
     }
 }
-
-server_response_from_impl!(LogoutResponse, Logout);
 
 impl EncodeTo for LogoutResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {

@@ -1,7 +1,5 @@
 use util::EncodeTo;
 
-use crate::{response::ServerResponse, server_response_from_impl};
-
 #[derive(Debug)]
 pub struct ListResponse {
     request_tag: String,
@@ -49,5 +47,3 @@ impl EncodeTo for ListResponse {
         buf.extend_from_slice(format!("{tag} OK LIST completed\r\n").as_bytes());
     }
 }
-
-server_response_from_impl!(ListResponse, List);

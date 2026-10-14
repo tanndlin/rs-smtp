@@ -1,4 +1,4 @@
-use imap_command_derive::ImapCommands;
+use imap_derive::ImapCommands;
 
 use crate::{
     command::{

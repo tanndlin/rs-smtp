@@ -1,7 +1,5 @@
 use util::EncodeTo;
 
-use crate::{response::ServerResponse, server_response_from_impl};
-
 #[derive(Debug)]
 pub struct AppendOkResponse {
     request_tag: String,
@@ -18,8 +16,6 @@ impl AppendOkResponse {
         }
     }
 }
-
-server_response_from_impl!(AppendOkResponse, Append);
 
 impl EncodeTo for AppendOkResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {

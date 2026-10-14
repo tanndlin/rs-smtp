@@ -1,4 +1,4 @@
-use crate::{command::SelectCommand, response::ServerResponse};
+use crate::command::SelectCommand;
 use util::EncodeTo;
 
 #[derive(Debug)]
@@ -41,11 +41,5 @@ impl EncodeTo for SelectResponse {
         buf.extend_from_slice(
             format!("{request_tag} OK [READ-WRITE] SELECT completed\r\n").as_bytes(),
         );
-    }
-}
-
-impl From<SelectResponse> for ServerResponse {
-    fn from(res: SelectResponse) -> Self {
-        ServerResponse::Select(res)
     }
 }

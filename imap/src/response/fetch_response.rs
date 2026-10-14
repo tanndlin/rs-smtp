@@ -2,8 +2,6 @@ use std::{collections::HashMap, fmt};
 
 use util::EncodeTo;
 
-use crate::{response::ServerResponse, server_response_from_impl};
-
 #[derive(Debug)]
 pub struct FetchResponse {
     request_tag: String,
@@ -95,5 +93,3 @@ impl fmt::Debug for FetchMessageResponse {
             .finish()
     }
 }
-
-server_response_from_impl!(FetchResponse, Fetch);

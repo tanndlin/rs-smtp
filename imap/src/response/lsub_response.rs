@@ -1,9 +1,6 @@
 use util::EncodeTo;
 
-use crate::{
-    response::{MailboxListEntry, ServerResponse},
-    server_response_from_impl,
-};
+use crate::response::MailboxListEntry;
 
 #[derive(Debug)]
 pub struct LsubResponse {
@@ -35,5 +32,3 @@ impl EncodeTo for LsubResponse {
         buf.extend_from_slice(format!("{tag} OK LSUB completed\r\n").as_bytes());
     }
 }
-
-server_response_from_impl!(LsubResponse, Lsub);

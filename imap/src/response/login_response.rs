@@ -1,10 +1,6 @@
 use util::EncodeTo;
 
-use crate::{
-    command::LoginCommand,
-    response::{ServerResponse, ServerResponseTrait},
-    server_response_from_impl,
-};
+use crate::{command::LoginCommand, response::ServerResponseTrait};
 
 #[derive(Debug)]
 pub struct LoginResponse {
@@ -30,8 +26,6 @@ impl ServerResponseTrait<LoginCommand> for LoginResponse {
         }
     }
 }
-
-server_response_from_impl!(LoginResponse, Login);
 
 impl EncodeTo for LoginResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {

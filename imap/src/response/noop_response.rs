@@ -1,10 +1,6 @@
 use util::EncodeTo;
 
-use crate::{
-    command::NoopCommand,
-    response::{ServerResponse, ServerResponseTrait},
-    server_response_from_impl,
-};
+use crate::{command::NoopCommand, response::ServerResponseTrait};
 
 #[derive(Debug)]
 pub struct NoopResponse {
@@ -18,8 +14,6 @@ impl ServerResponseTrait<NoopCommand> for NoopResponse {
         }
     }
 }
-
-server_response_from_impl!(NoopResponse, Noop);
 
 impl EncodeTo for NoopResponse {
     fn encode_to(self, buf: &mut Vec<u8>) {
