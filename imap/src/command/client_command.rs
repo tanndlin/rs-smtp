@@ -13,20 +13,35 @@ use crate::{
 
 #[derive(Debug, ImapCommands)]
 pub enum ClientCommand {
+    #[imap(states(NotAuthenticated, Authenticated))]
     Capability(CapabilityCommand),
+    #[imap(states(NotAuthenticated))]
     StartTLS(StartTLSCommand),
+    #[imap(states(NotAuthenticated))]
     Login(LoginCommand),
+    #[imap(states(Authenticated))]
     List(ListCommand),
+    #[imap(states(Authenticated))]
     Lsub(LsubCommand),
+    #[imap(states(Authenticated))]
     Select(SelectCommand),
+    #[imap(states(Authenticated))]
     Status(StatusCommand),
+    #[imap(states(Authenticated))]
     Fetch(FetchCommand),
+    #[imap(states(Authenticated))]
     Append(AppendCommand),
+    #[imap(states(NotAuthenticated, Authenticated))]
     Logout(LogoutCommand),
+    #[imap(states(Authenticated))]
     UID(UIDCommand),
+    #[imap(states(Authenticated))]
     Create(CreateCommand),
+    #[imap(states(NotAuthenticated, Authenticated))]
     Noop(NoopCommand),
+    #[imap(states(Authenticated))]
     Store(StoreCommand),
+    #[imap(states(Authenticated))]
     Check(CheckCommand),
 }
 

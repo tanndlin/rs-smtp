@@ -96,20 +96,34 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let mut from_impls = Vec::new();
     let mut parse_bytes_arms = Vec::new();
     let mut tag_arms = Vec::new();
+    let mut allowed_arms = Vec::new();
     for (variant, ty) in wrapping_variants(input, "ImapCommands")? {
         let ident = &variant.ident;
 
         let mut keyword = ident.to_string().to_uppercase();
+        let mut states: Option<Vec<Ident>> = None;
         for attr in variant.attrs.iter().filter(|a| a.path().is_ident("imap")) {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("keyword") {
                     keyword = meta.value()?.parse::<LitStr>()?.value();
                     Ok(())
+                } else if meta.path.is_ident("states") {
+                    let list = states.get_or_insert_with(Vec::new);
+                    meta.parse_nested_meta(|state| {
+                        list.push(state.path.require_ident()?.clone());
+                        Ok(())
+                    })
                 } else {
-                    Err(meta.error("unsupported imap attribute, expected `keyword`"))
+                    Err(meta.error("unsupported imap attribute, expected `keyword` or `states`"))
                 }
             })?;
         }
+        let Some(states) = states else {
+            return Err(syn::Error::new_spanned(
+                variant,
+                "missing `#[imap(states(...))]`: list the session states this command is valid in",
+            ));
+        };
 
         from_impls.push(from_impl(name, ident, ty));
         parse_bytes_arms.push(quote! {
@@ -122,6 +136,13 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         let tag_access = quote_spanned! {ty.span()=> &c.tag };
         tag_arms.push(quote! {
             #name::#ident(c) => #tag_access,
+        });
+
+        allowed_arms.push(quote! {
+            #name::#ident(_) => ::core::matches!(
+                state,
+                #(crate::imap_session::SessionState::#states)|*
+            ),
         });
     }
 
@@ -145,6 +166,13 @@ fn expand(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                         );
                     }
                 })
+            }
+
+            /// Whether this command may be issued in `state` (RFC 3501 §6).
+            pub fn allowed_in(&self, state: crate::imap_session::SessionState) -> bool {
+                match self {
+                    #(#allowed_arms)*
+                }
             }
 
             pub fn tag(&self) -> &str {

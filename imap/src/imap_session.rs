@@ -44,8 +44,8 @@ struct MessageRef {
     uid: i32,
 }
 
-#[derive(Default)]
-enum SessionState {
+#[derive(Default, Clone, Copy)]
+pub enum SessionState {
     #[default]
     Uninitialized,
     NotAuthenticated,
@@ -101,60 +101,44 @@ impl IMAPSession {
 
     pub async fn handle_command(&mut self, command: ClientCommand) -> ServerResponse {
         match self.auth_state {
-            SessionState::Uninitialized => panic!("Recevied command in an uninitialized state"),
-            SessionState::NotAuthenticated => match command {
-                ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
-                ClientCommand::StartTLS(_) => unimplemented!(),
-                ClientCommand::Login(cmd) => {
-                    let res = LoginResponse::respond_to(cmd);
-                    match res.result {
-                        LoginResult::Ok => {
-                            self.auth_state = SessionState::Authenticated;
-                            res.into()
-                        }
-                        LoginResult::No => res.into(),
-                    }
-                }
-                ClientCommand::Logout(cmd) => self.handle_logout_command(cmd).into(),
-                ClientCommand::Noop(noop_command) => NoopResponse::respond_to(noop_command).into(),
-                cmd @ (ClientCommand::List(_)
-                | ClientCommand::Lsub(_)
-                | ClientCommand::Select(_)
-                | ClientCommand::Status(_)
-                | ClientCommand::Fetch(_)
-                | ClientCommand::Append(_)
-                | ClientCommand::UID(_)
-                | ClientCommand::Create(_)
-                | ClientCommand::Store(_)
-                | ClientCommand::Check(_)) => {
-                    cmd.protocol_violation("Not authorized".to_string()).into()
-                }
-            },
-            SessionState::Authenticated => match command {
-                ClientCommand::List(cmd) => self.handle_list_command(cmd).into(),
-                ClientCommand::Lsub(cmd) => self.handle_lsub_command(cmd).into(),
-                ClientCommand::Select(cmd) => self.handle_select_command(cmd).await.into(),
-                ClientCommand::Status(cmd) => self.handle_status_command(cmd).await.into(),
-                ClientCommand::Fetch(cmd) => self
-                    .handle_fetch_command(cmd, Addressing::BySeq)
-                    .await
-                    .into(),
-                ClientCommand::Append(cmd) => self.handle_append_command(cmd).await.into(),
-                ClientCommand::Logout(cmd) => self.handle_logout_command(cmd).into(),
-                ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
-                ClientCommand::UID(cmd) => self.handle_uid(cmd).await.into(),
-                ClientCommand::Create(cmd) => self.handle_create_command(cmd).await.into(),
-                ClientCommand::Store(cmd) => self
-                    .handle_store_command(cmd, Addressing::BySeq)
-                    .await
-                    .into(),
-                ClientCommand::Noop(noop_command) => NoopResponse::respond_to(noop_command).into(),
-                ClientCommand::Check(cmd) => self.handle_check_command(cmd).into(),
-                ClientCommand::StartTLS(_) | ClientCommand::Login(_) => {
-                    todo!("This should return an error")
-                }
-            },
+            SessionState::Uninitialized => panic!("Received command in an uninitialized state"),
             SessionState::Logout => panic!("Received command after LOGOUT"),
+            _ => {}
+        }
+        if !command.allowed_in(self.auth_state) {
+            return command
+                .protocol_violation("Command not allowed in this state".to_string())
+                .into();
+        }
+
+        match command {
+            ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
+            ClientCommand::StartTLS(_) => unimplemented!(),
+            ClientCommand::Login(cmd) => {
+                let res = LoginResponse::respond_to(cmd);
+                if let LoginResult::Ok = res.result {
+                    self.auth_state = SessionState::Authenticated;
+                }
+                res.into()
+            }
+            ClientCommand::Logout(cmd) => self.handle_logout_command(cmd).into(),
+            ClientCommand::Noop(cmd) => NoopResponse::respond_to(cmd).into(),
+            ClientCommand::List(cmd) => self.handle_list_command(cmd).into(),
+            ClientCommand::Lsub(cmd) => self.handle_lsub_command(cmd).into(),
+            ClientCommand::Select(cmd) => self.handle_select_command(cmd).await.into(),
+            ClientCommand::Status(cmd) => self.handle_status_command(cmd).await.into(),
+            ClientCommand::Fetch(cmd) => self
+                .handle_fetch_command(cmd, Addressing::BySeq)
+                .await
+                .into(),
+            ClientCommand::Append(cmd) => self.handle_append_command(cmd).await.into(),
+            ClientCommand::UID(cmd) => self.handle_uid(cmd).await.into(),
+            ClientCommand::Create(cmd) => self.handle_create_command(cmd).await.into(),
+            ClientCommand::Store(cmd) => self
+                .handle_store_command(cmd, Addressing::BySeq)
+                .await
+                .into(),
+            ClientCommand::Check(cmd) => self.handle_check_command(cmd).into(),
         }
     }
 
