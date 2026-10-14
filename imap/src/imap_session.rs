@@ -115,7 +115,7 @@ impl IMAPSession {
                         LoginResult::No => res.into(),
                     }
                 }
-                ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
+                ClientCommand::Logout(cmd) => self.handle_logout_command(cmd).into(),
                 ClientCommand::Noop(noop_command) => NoopResponse::respond_to(noop_command).into(),
                 cmd @ (ClientCommand::List(_)
                 | ClientCommand::Lsub(_)
@@ -131,23 +131,25 @@ impl IMAPSession {
                 }
             },
             SessionState::Authenticated => match command {
-                ClientCommand::List(cmd) => self.handle_list_command(cmd),
-                ClientCommand::Lsub(cmd) => self.handle_lsub_command(cmd),
-                ClientCommand::Select(cmd) => self.handle_select_command(cmd).await,
-                ClientCommand::Status(cmd) => self.handle_status_command(cmd).await,
-                ClientCommand::Fetch(cmd) => {
-                    self.handle_fetch_command(cmd, Addressing::BySeq).await
-                }
-                ClientCommand::Append(cmd) => self.handle_append_command(cmd).await,
-                ClientCommand::Logout(cmd) => self.handle_logout_command(cmd),
+                ClientCommand::List(cmd) => self.handle_list_command(cmd).into(),
+                ClientCommand::Lsub(cmd) => self.handle_lsub_command(cmd).into(),
+                ClientCommand::Select(cmd) => self.handle_select_command(cmd).await.into(),
+                ClientCommand::Status(cmd) => self.handle_status_command(cmd).await.into(),
+                ClientCommand::Fetch(cmd) => self
+                    .handle_fetch_command(cmd, Addressing::BySeq)
+                    .await
+                    .into(),
+                ClientCommand::Append(cmd) => self.handle_append_command(cmd).await.into(),
+                ClientCommand::Logout(cmd) => self.handle_logout_command(cmd).into(),
                 ClientCommand::Capability(cmd) => CapabilityResponse::respond_to(cmd).into(),
-                ClientCommand::UID(cmd) => self.handle_uid(cmd).await,
-                ClientCommand::Create(cmd) => self.handle_create_command(cmd).await,
-                ClientCommand::Store(cmd) => {
-                    self.handle_store_command(cmd, Addressing::BySeq).await
-                }
+                ClientCommand::UID(cmd) => self.handle_uid(cmd).await.into(),
+                ClientCommand::Create(cmd) => self.handle_create_command(cmd).await.into(),
+                ClientCommand::Store(cmd) => self
+                    .handle_store_command(cmd, Addressing::BySeq)
+                    .await
+                    .into(),
                 ClientCommand::Noop(noop_command) => NoopResponse::respond_to(noop_command).into(),
-                ClientCommand::Check(cmd) => self.handle_check_command(cmd),
+                ClientCommand::Check(cmd) => self.handle_check_command(cmd).into(),
                 ClientCommand::StartTLS(_) | ClientCommand::Login(_) => {
                     todo!("This should return an error")
                 }
@@ -156,33 +158,35 @@ impl IMAPSession {
         }
     }
 
-    fn handle_logout_command(&mut self, cmd: LogoutCommand) -> ServerResponse {
+    fn handle_logout_command(&mut self, cmd: LogoutCommand) -> LogoutResponse {
         self.auth_state = SessionState::Logout;
-        LogoutResponse::respond_to(cmd).into()
+        LogoutResponse::respond_to(cmd)
     }
 
-    fn handle_check_command(&self, cmd: CheckCommand) -> ServerResponse {
+    fn handle_check_command(
+        &self,
+        cmd: CheckCommand,
+    ) -> Result<CheckResponse, ServerErrorResponse> {
         if self.selected_mailbox.is_none() {
-            return ServerErrorResponse::protocol_violation(
+            return Err(ServerErrorResponse::protocol_violation(
                 cmd.tag,
                 "No mailbox selected".to_string(),
-            )
-            .into();
+            ));
         }
-        CheckResponse::respond_to(cmd).into()
+        Ok(CheckResponse::respond_to(cmd))
     }
 
-    fn handle_list_command(&mut self, cmd: ListCommand) -> ServerResponse {
+    fn handle_list_command(&mut self, cmd: ListCommand) -> ListResponse {
         let inbox = MailboxListEntry::new(
             vec!["\\Unmarked", "\\HasNoChildren"],
             None,
             "Inbox".to_string(),
         );
         let mailboxes: Vec<MailboxListEntry> = vec![inbox];
-        ListResponse::new(cmd.tag, mailboxes).into()
+        ListResponse::new(cmd.tag, mailboxes)
     }
 
-    fn handle_lsub_command(&mut self, cmd: LsubCommand) -> ServerResponse {
+    fn handle_lsub_command(&mut self, cmd: LsubCommand) -> LsubResponse {
         // TODO
         let inbox = MailboxListEntry::new(
             vec!["\\Unmarked", "\\HasNoChildren"],
@@ -190,10 +194,10 @@ impl IMAPSession {
             "Inbox".to_string(),
         );
         let mailboxes: Vec<MailboxListEntry> = vec![inbox];
-        LsubResponse::new(cmd.tag, mailboxes).into()
+        LsubResponse::new(cmd.tag, mailboxes)
     }
 
-    async fn handle_select_command(&mut self, cmd: SelectCommand) -> ServerResponse {
+    async fn handle_select_command(&mut self, cmd: SelectCommand) -> SelectResponse {
         assert!(cmd.mailbox == "INBOX");
         let mailbox = Mailbox::fetch(&*self.db_pool, &cmd.mailbox)
             .await
@@ -219,10 +223,10 @@ impl IMAPSession {
 
         let validity_uid = mailbox.uid_validity as u64;
 
-        SelectResponse::new(cmd, exists, next_uid, validity_uid).into()
+        SelectResponse::new(cmd, exists, next_uid, validity_uid)
     }
 
-    async fn handle_status_command(&mut self, cmd: StatusCommand) -> ServerResponse {
+    async fn handle_status_command(&mut self, cmd: StatusCommand) -> StatusResponse {
         assert!(cmd.mailbox == "INBOX");
 
         let messages = if cmd.messages {
@@ -294,7 +298,7 @@ impl IMAPSession {
             None
         };
 
-        StatusResponse::new(cmd, messages, next_uid, validity_uid, unseen, deleted).into()
+        StatusResponse::new(cmd, messages, next_uid, validity_uid, unseen, deleted)
     }
 
     /// Resolve a sequence set against the messages that actually exist.
@@ -342,7 +346,7 @@ impl IMAPSession {
         &self,
         cmd: FetchCommand,
         addressing: Addressing,
-    ) -> ServerResponse {
+    ) -> FetchResponse {
         let messages = self.resolve_sequence_set(&cmd.sequences, addressing).await;
 
         let mut responses = Vec::new();
@@ -382,22 +386,25 @@ impl IMAPSession {
             responses.push(FetchMessageResponse::new(message.seqnum, metadata));
         }
 
-        FetchResponse::new(cmd.tag, responses).into()
+        FetchResponse::new(cmd.tag, responses)
     }
 
-    async fn handle_append_command(&mut self, mut cmd: AppendCommand) -> ServerResponse {
+    async fn handle_append_command(
+        &mut self,
+        mut cmd: AppendCommand,
+    ) -> Result<ServerResponse, ServerErrorResponse> {
         // Check if the mailbox exists
         let mailbox = Mailbox::fetch(&*self.db_pool, &cmd.mailbox)
             .await
             .expect("Failed to look up mailbox");
         if mailbox.is_none() {
-            return ServerResponse::Error(ServerErrorResponse {
+            return Err(ServerErrorResponse {
                 tag: Some(cmd.tag.to_string()),
                 reason: ServerErrorReason::Deny("TRYCREATE".to_string()),
             });
         }
 
-        match cmd.message.take() {
+        Ok(match cmd.message.take() {
             Some(message) => {
                 let (uid_validity, uid) = self.store_appended_message(&cmd, &message).await;
                 AppendOkResponse::new(cmd.tag, uid_validity, uid).into()
@@ -409,7 +416,7 @@ impl IMAPSession {
                 self.expecting_append_mail = Some(cmd);
                 ContinuationResponse { tag }.into() // encodes `+ ...\r\n`
             }
-        }
+        })
     }
 
     /// Persist an appended message and allocate it a UID in `cmd.mailbox`.
@@ -443,7 +450,7 @@ impl IMAPSession {
         (uid_validity as u32, uid as u32)
     }
 
-    async fn handle_uid(&self, cmd: UIDCommand) -> ServerResponse {
+    async fn handle_uid(&self, cmd: UIDCommand) -> FetchResponse {
         match cmd.command {
             UIDCommandType::Fetch {
                 sequences,
@@ -477,13 +484,16 @@ impl IMAPSession {
         }
     }
 
-    async fn handle_create_command(&self, cmd: CreateCommand) -> ServerResponse {
+    async fn handle_create_command(
+        &self,
+        cmd: CreateCommand,
+    ) -> Result<CreateResponse, ServerErrorResponse> {
         // Check if the mailbox exists
         let mailbox = Mailbox::fetch(&*self.db_pool, &cmd.mailbox)
             .await
             .expect("Failed to look up mailbox");
         if mailbox.is_some() {
-            return ServerResponse::Error(ServerErrorResponse {
+            return Err(ServerErrorResponse {
                 tag: Some(cmd.tag.to_string()),
                 reason: ServerErrorReason::Deny("ALREADYEXISTS".to_string()),
             });
@@ -493,14 +503,14 @@ impl IMAPSession {
             .await
             .expect("Failed to create mailbox");
 
-        CreateResponse::new(cmd.tag, mailbox.uid_validity as u32).into()
+        Ok(CreateResponse::new(cmd.tag, mailbox.uid_validity as u32))
     }
 
     async fn handle_store_command(
         &self,
         store_cmd: StoreCommand,
         by_uid: Addressing,
-    ) -> ServerResponse {
+    ) -> FetchResponse {
         let messages = self
             .resolve_sequence_set(&store_cmd.sequences, by_uid)
             .await;
@@ -527,6 +537,6 @@ impl IMAPSession {
             responses.push(FetchMessageResponse::new(message.seqnum, metadata));
         }
 
-        FetchResponse::new(store_cmd.tag, responses).into()
+        FetchResponse::new(store_cmd.tag, responses)
     }
 }

@@ -27,3 +27,16 @@ pub enum ServerResponse {
 pub trait ServerResponseTrait<T>: EncodeTo {
     fn respond_to(cmd: T) -> Self;
 }
+
+impl<T, E> From<Result<T, E>> for ServerResponse
+where
+    T: Into<ServerResponse>,
+    E: Into<ServerResponse>,
+{
+    fn from(res: Result<T, E>) -> Self {
+        match res {
+            Ok(ok) => ok.into(),
+            Err(err) => err.into(),
+        }
+    }
+}
