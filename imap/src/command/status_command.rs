@@ -3,6 +3,7 @@ use crate::{
 };
 
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools, reason = "independent STATUS item flags, not states")]
 pub struct StatusCommand {
     pub tag: String,
     pub mailbox: String,
@@ -20,7 +21,7 @@ impl ClientCommandTrait for StatusCommand {
     fn parse_bytes(tag: String, cursor: &mut Cursor) -> Result<Self, CommandParseError> {
         let mailbox = cursor.string()?.to_string();
 
-        let flags = cursor.paren_list(|c| c.atom())?;
+        let flags = cursor.paren_list(Cursor::atom)?;
 
         let messages = flags.contains(&"MESSAGES");
         let next_uid = flags.contains(&"UIDNEXT");

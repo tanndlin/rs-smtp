@@ -35,9 +35,7 @@ impl Email {
 }
 
 fn address_list(raw: &str, name: &str) -> Vec<String> {
-    header(raw, name)
-        .map(|v| v.split(',').map(|s| s.trim().to_string()).collect())
-        .unwrap_or_default()
+    header(raw, name).map_or_default(|v| v.split(',').map(|s| s.trim().to_string()).collect())
 }
 
 /// Reduce an address to its comparable form: the `addr-spec` inside any

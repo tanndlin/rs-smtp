@@ -100,7 +100,7 @@ mod tests {
 
         assert_eq!(cmd.tag, "a1");
         assert_eq!(cmd.mailbox, "INBOX");
-        assert!(cmd.flags.is_empty());
+        assert_eq!(cmd.flags, [] as [String; 0]);
         assert_eq!(cmd.date_time, None);
         assert_eq!(cmd.message.as_deref(), Some(&b"Hello, World!"[..]));
         // The whole command, literal and trailing CRLF included, is consumed.
@@ -127,7 +127,7 @@ mod tests {
     fn parses_empty_flag_list() {
         let (cmd, _) = parse(b"a1 APPEND INBOX () {5+}\r\nhello\r\n");
 
-        assert!(cmd.flags.is_empty());
+        assert_eq!(cmd.flags, [] as [String; 0]);
     }
 
     #[test]
@@ -138,7 +138,7 @@ mod tests {
             cmd.date_time.map(|d| d.to_rfc3339()),
             Some("2024-10-23T19:00:00+00:00".to_string())
         );
-        assert!(cmd.flags.is_empty());
+        assert_eq!(cmd.flags, [] as [String; 0]);
     }
 
     #[test]

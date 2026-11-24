@@ -94,7 +94,7 @@ fn flags_for(resp: &str, seqnum: u32) -> Option<BTreeSet<String>> {
 }
 
 fn set(flags: &[&str]) -> BTreeSet<String> {
-    flags.iter().map(|f| f.to_string()).collect()
+    flags.iter().map(ToString::to_string).collect()
 }
 
 /// The flags message `seqnum` has persisted, read back through FETCH.

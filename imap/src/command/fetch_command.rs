@@ -66,7 +66,7 @@ impl Sequence {
         if let Some(next) = cursor.peek_nonspace()
             && next == b':'
         {
-            cursor.eat(b':').unwrap();
+            cursor.eat(b':')?;
             let end = cursor.sequence_indicator()?;
             Ok(Self::Range { start, end })
         } else {
@@ -253,12 +253,10 @@ impl fmt::Display for Fetchable {
             Fetchable::Envelope => f.write_str("ENVELOPE"),
             Fetchable::Flags => f.write_str("FLAGS"),
             Fetchable::Internaldate => f.write_str("INTERNALDATE"),
-            Fetchable::RFC822 => f.write_str("RFC822"),
+            Fetchable::RFC822 | Fetchable::RFC822Peek => f.write_str("RFC822"),
+            Fetchable::RFC822Text | Fetchable::RFC822TextPeek => f.write_str("RFC822.TEXT"),
             Fetchable::RFC822Header => f.write_str("RFC822.HEADER"),
-            Fetchable::RFC822Peek => f.write_str("RFC822"),
             Fetchable::RFC822Size => f.write_str("RFC822.SIZE"),
-            Fetchable::RFC822Text => f.write_str("RFC822.TEXT"),
-            Fetchable::RFC822TextPeek => f.write_str("RFC822.TEXT"),
             Fetchable::UID => f.write_str("UID"),
         }
     }
@@ -570,7 +568,7 @@ impl ClientCommandTrait for FetchCommand {
 
         // A FETCH takes either a parenthesized list of items, or a single
         // bare item with no parens (e.g. `FETCH 1 BODY`).
-        let items = match cursor.paren_list(|c| c.fetch_att()) {
+        let items = match cursor.paren_list(Cursor::fetch_att) {
             Ok(items) => items,
             Err(_) => vec![cursor.fetch_att()?],
         };
@@ -645,8 +643,8 @@ mod tests {
     fn matches_across_the_whole_uid_space() {
         let sequences = set(b"1:4294967295");
 
-        assert!(Sequence::set_contains(&sequences, 90210, 4294967295));
-        assert!(!Sequence::set_contains(&sequences, 0, 4294967295));
+        assert!(Sequence::set_contains(&sequences, 90210, 4_294_967_295));
+        assert!(!Sequence::set_contains(&sequences, 0, 4_294_967_295));
     }
 
     /// Every item of a comma separated set is consulted.
@@ -679,12 +677,12 @@ mod tests {
             panic!("expected ClientCommand::Fetch, got {cmd:?}");
         };
 
-        assert!(cmd.sequences.len() == 1);
+        assert_eq!(cmd.sequences.len(), 1);
         assert!(matches!(
             cmd.sequences[0],
             Sequence::Single(FetchIndicator::Index(1))
         ));
-        assert!(cmd.fetch_list.len() == 1);
+        assert_eq!(cmd.fetch_list.len(), 1);
         assert!(matches!(
             cmd.fetch_list[0],
             Fetchable::Body(BodyFetchable::Full)
@@ -698,12 +696,12 @@ mod tests {
             panic!("expected ClientCommand::Fetch, got {cmd:?}");
         };
 
-        assert!(cmd.sequences.len() == 1);
+        assert_eq!(cmd.sequences.len(), 1);
         assert!(matches!(
             cmd.sequences[0],
             Sequence::Single(FetchIndicator::Index(1))
         ));
-        assert!(cmd.fetch_list.len() == 1);
+        assert_eq!(cmd.fetch_list.len(), 1);
         assert!(matches!(
             cmd.fetch_list[0],
             Fetchable::Body(BodyFetchable::Full)
@@ -717,12 +715,12 @@ mod tests {
             panic!("expected ClientCommand::Fetch, got {cmd:?}");
         };
 
-        assert!(cmd.sequences.len() == 1);
+        assert_eq!(cmd.sequences.len(), 1);
         assert!(matches!(
             cmd.sequences[0],
             Sequence::Single(FetchIndicator::Wild)
         ));
-        assert!(cmd.fetch_list.len() == 1);
+        assert_eq!(cmd.fetch_list.len(), 1);
         assert!(matches!(
             cmd.fetch_list[0],
             Fetchable::Body(BodyFetchable::Full)
@@ -751,7 +749,7 @@ mod tests {
             }
         ));
 
-        assert!(cmd.fetch_list.len() == 1);
+        assert_eq!(cmd.fetch_list.len(), 1);
         assert!(matches!(
             cmd.fetch_list[0],
             Fetchable::Body(BodyFetchable::Full)
@@ -773,7 +771,7 @@ mod tests {
             }
         ));
 
-        assert!(cmd.fetch_list.len() == 1);
+        assert_eq!(cmd.fetch_list.len(), 1);
         assert!(matches!(
             cmd.fetch_list[0],
             Fetchable::Body(BodyFetchable::Full)

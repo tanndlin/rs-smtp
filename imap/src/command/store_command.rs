@@ -94,7 +94,7 @@ mod tests {
             }]
         ));
         assert_eq!(cmd.store.operation, StoreOperation::Replace);
-        assert!(cmd.store.flags.is_empty());
+        assert_eq!(cmd.store.flags, [] as [String; 0]);
     }
 
     #[test]

@@ -51,7 +51,7 @@ async fn append_with_synchronizing_literal_gets_continuation() {
     stream.write_all(b"a2 APPEND INBOX {13}\r\n").unwrap();
     let cont = read_available(&mut stream);
     assert!(
-        cont.starts_with("+"),
+        cont.starts_with('+'),
         "expected `+` continuation request, got: {cont:?}"
     );
 
@@ -73,7 +73,7 @@ async fn append_with_synchronizing_literal_back_to_back() {
     stream.write_all(b"a2 APPEND INBOX {13}\r\n").unwrap();
     let cont = read_available(&mut stream);
     assert!(
-        cont.starts_with("+"),
+        cont.starts_with('+'),
         "expected `+` continuation request, got: {cont:?}"
     );
 
@@ -88,7 +88,7 @@ async fn append_with_synchronizing_literal_back_to_back() {
     stream.write_all(b"a2 APPEND INBOX {13}\r\n").unwrap();
     let cont = read_available(&mut stream);
     assert!(
-        cont.starts_with("+"),
+        cont.starts_with('+'),
         "expected `+` continuation request, got: {cont:?}"
     );
 

@@ -81,7 +81,7 @@ impl IMAPSession {
             let mut cursor = Cursor::new(buf);
             let length = append_cmd.message_length;
             // Grab the next {length} bytes
-            append_cmd.message = Some(cursor.raw(length).to_vec());
+            append_cmd.message = Some(cursor.raw(length));
             let res = self.handle_command(append_cmd.into()).await;
             self.expecting_append_mail = None;
             cursor.expect_crlf()?;
@@ -99,6 +99,7 @@ impl IMAPSession {
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn handle_command(&mut self, command: ClientCommand) -> ServerResponse {
         match self.auth_state {
             SessionState::Uninitialized => panic!("Received command in an uninitialized state"),
@@ -122,8 +123,8 @@ impl IMAPSession {
             }
             ClientCommand::Logout(cmd) => self.handle_logout_command(cmd).into(),
             ClientCommand::Noop(cmd) => NoopResponse::respond_to(cmd).into(),
-            ClientCommand::List(cmd) => self.handle_list_command(cmd).into(),
-            ClientCommand::Lsub(cmd) => self.handle_lsub_command(cmd).into(),
+            ClientCommand::List(cmd) => Self::handle_list_command(cmd).into(),
+            ClientCommand::Lsub(cmd) => Self::handle_lsub_command(cmd).into(),
             ClientCommand::Select(cmd) => self.handle_select_command(cmd).await.into(),
             ClientCommand::Status(cmd) => self.handle_status_command(cmd).await.into(),
             ClientCommand::Fetch(cmd) => self
@@ -159,7 +160,7 @@ impl IMAPSession {
         Ok(CheckResponse::respond_to(cmd))
     }
 
-    fn handle_list_command(&mut self, cmd: ListCommand) -> ListResponse {
+    fn handle_list_command(cmd: ListCommand) -> ListResponse {
         let inbox = MailboxListEntry::new(
             vec!["\\Unmarked", "\\HasNoChildren"],
             None,
@@ -169,7 +170,7 @@ impl IMAPSession {
         ListResponse::new(cmd.tag, mailboxes)
     }
 
-    fn handle_lsub_command(&mut self, cmd: LsubCommand) -> LsubResponse {
+    fn handle_lsub_command(cmd: LsubCommand) -> LsubResponse {
         // TODO
         let inbox = MailboxListEntry::new(
             vec!["\\Unmarked", "\\HasNoChildren"],
@@ -181,7 +182,7 @@ impl IMAPSession {
     }
 
     async fn handle_select_command(&mut self, cmd: SelectCommand) -> SelectResponse {
-        assert!(cmd.mailbox == "INBOX");
+        assert_eq!(cmd.mailbox, "INBOX");
         let mailbox = Mailbox::fetch(&*self.db_pool, &cmd.mailbox)
             .await
             .expect("Failed to look up mailbox")
@@ -210,7 +211,7 @@ impl IMAPSession {
     }
 
     async fn handle_status_command(&mut self, cmd: StatusCommand) -> StatusResponse {
-        assert!(cmd.mailbox == "INBOX");
+        assert_eq!(cmd.mailbox, "INBOX");
 
         let messages = if cmd.messages {
             Some(
@@ -382,23 +383,20 @@ impl IMAPSession {
             .expect("Failed to look up mailbox");
         if mailbox.is_none() {
             return Err(ServerErrorResponse {
-                tag: Some(cmd.tag.to_string()),
+                tag: Some(cmd.tag),
                 reason: ServerErrorReason::Deny("TRYCREATE".to_string()),
             });
         }
 
-        Ok(match cmd.message.take() {
-            Some(message) => {
-                let (uid_validity, uid) = self.store_appended_message(&cmd, &message).await;
-                AppendOkResponse::new(cmd.tag, uid_validity, uid).into()
-            }
-            None => {
-                // synchronizing literal: tell the client to send the bytes,
-                // and remember we're mid-APPEND so the next read isn't parsed as a command
-                let tag = cmd.tag.clone();
-                self.expecting_append_mail = Some(cmd);
-                ContinuationResponse { tag }.into() // encodes `+ ...\r\n`
-            }
+        Ok(if let Some(message) = cmd.message.take() {
+            let (uid_validity, uid) = self.store_appended_message(&cmd, &message).await;
+            AppendOkResponse::new(cmd.tag, uid_validity, uid).into()
+        } else {
+            // synchronizing literal: tell the client to send the bytes,
+            // and remember we're mid-APPEND so the next read isn't parsed as a command
+            let tag = cmd.tag.clone();
+            self.expecting_append_mail = Some(cmd);
+            ContinuationResponse { tag }.into() // encodes `+ ...\r\n`
         })
     }
 
@@ -477,7 +475,7 @@ impl IMAPSession {
             .expect("Failed to look up mailbox");
         if mailbox.is_some() {
             return Err(ServerErrorResponse {
-                tag: Some(cmd.tag.to_string()),
+                tag: Some(cmd.tag),
                 reason: ServerErrorReason::Deny("ALREADYEXISTS".to_string()),
             });
         }

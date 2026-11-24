@@ -25,8 +25,7 @@ impl EncodeTo for LsubResponse {
             let attrs = mbox.attributes.join(" ");
             let delim = mbox
                 .delimiter
-                .map(|c| format!("\"{c}\""))
-                .unwrap_or_else(|| "NIL".to_string());
+                .map_or_else(|| "NIL".to_string(), |c| format!("\"{c}\""));
             buf.extend_from_slice(format!("* LSUB ({attrs}) {delim} {}\r\n", mbox.name).as_bytes());
         }
         buf.extend_from_slice(format!("{tag} OK LSUB completed\r\n").as_bytes());

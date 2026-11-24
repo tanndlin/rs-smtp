@@ -33,10 +33,10 @@ impl EncodeTo for LoginResponse {
 
         match self.result {
             LoginResult::Ok => {
-                buf.extend_from_slice(format!("{tag} OK LOGIN completed\r\n").as_bytes())
+                buf.extend_from_slice(format!("{tag} OK LOGIN completed\r\n").as_bytes());
             }
             LoginResult::No => {
-                buf.extend_from_slice(format!("{tag} No LOGIN incorrect creds\r\n").as_bytes())
+                buf.extend_from_slice(format!("{tag} No LOGIN incorrect creds\r\n").as_bytes());
             }
         }
     }

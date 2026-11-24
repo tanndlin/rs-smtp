@@ -5,6 +5,7 @@ use util::{BodyStructure, Email};
 
 use crate::command::{BodyFetchable, Fetchable, Partial, Section, SectionText};
 
+#[allow(clippy::missing_panics_doc)]
 /// Render one FETCH data item as the string to splice into the response.
 pub async fn get_fetchable(db_pool: Arc<Pool<Postgres>>, id: i32, fetchable: &Fetchable) -> String {
     // UID is storage bookkeeping, not part of the message - look it up directly.
@@ -19,7 +20,7 @@ pub async fn get_fetchable(db_pool: Arc<Pool<Postgres>>, id: i32, fetchable: &Fe
     match fetchable {
         Fetchable::Envelope => envelope(&email),
         Fetchable::RFC822Header => handle_body(
-            email,
+            &email,
             &BodyFetchable::Section {
                 peek: true,
                 section: Section::Msg(SectionText::Header),
@@ -27,7 +28,7 @@ pub async fn get_fetchable(db_pool: Arc<Pool<Postgres>>, id: i32, fetchable: &Fe
             },
         ),
         Fetchable::RFC822 => handle_body(
-            email,
+            &email,
             &BodyFetchable::Section {
                 peek: false,
                 section: Section::Full,
@@ -35,7 +36,7 @@ pub async fn get_fetchable(db_pool: Arc<Pool<Postgres>>, id: i32, fetchable: &Fe
             },
         ),
         Fetchable::RFC822Peek => handle_body(
-            email,
+            &email,
             &BodyFetchable::Section {
                 peek: true,
                 section: Section::Full,
@@ -44,7 +45,7 @@ pub async fn get_fetchable(db_pool: Arc<Pool<Postgres>>, id: i32, fetchable: &Fe
         ),
         Fetchable::RFC822Size => email.raw_eml.len().to_string(),
         Fetchable::RFC822Text => handle_body(
-            email,
+            &email,
             &BodyFetchable::Section {
                 peek: false,
                 section: Section::Msg(SectionText::Text),
@@ -52,18 +53,18 @@ pub async fn get_fetchable(db_pool: Arc<Pool<Postgres>>, id: i32, fetchable: &Fe
             },
         ),
         Fetchable::RFC822TextPeek => handle_body(
-            email,
+            &email,
             &BodyFetchable::Section {
                 peek: true,
                 section: Section::Msg(SectionText::Text),
                 partial: None,
             },
         ),
-        Fetchable::All => unreachable!("expanded before reaching get_fetchable"),
-        Fetchable::Fast => unreachable!("expanded before reaching get_fetchable"),
-        Fetchable::Full => unreachable!("expanded before reaching get_fetchable"),
+        Fetchable::All | Fetchable::Fast | Fetchable::Full => {
+            unreachable!("expanded before reaching get_fetchable")
+        }
         Fetchable::Binary(_) => todo!(),
-        Fetchable::Body(b) => handle_body(email, b),
+        Fetchable::Body(b) => handle_body(&email, b),
         Fetchable::BodyStructure => handle_bodystructure(&email),
         Fetchable::Flags => format!("({})", email.flags.join(" ")),
         Fetchable::Internaldate => internal_date(&email),
@@ -83,15 +84,11 @@ fn handle_bodystructure(email: &Email) -> String {
         lines,
     } = BodyStructure::from(email);
 
-    let content_id = content_id
-        .map(|id| format!("\"{}\"", id))
-        .unwrap_or_else(|| "NIL".to_string());
-    let content_description = content_description
-        .map(|desc| format!("\"{}\"", desc))
-        .unwrap_or_else(|| "NIL".to_string());
-    let content_transfer_encoding = content_transfer_encoding
-        .map(|enc| format!("\"{}\"", enc))
-        .unwrap_or_else(|| "NIL".to_string());
+    let content_id = content_id.map_or_else(|| "NIL".to_string(), |id| format!("\"{id}\""));
+    let content_description =
+        content_description.map_or_else(|| "NIL".to_string(), |desc| format!("\"{desc}\""));
+    let content_transfer_encoding =
+        content_transfer_encoding.map_or_else(|| "NIL".to_string(), |enc| format!("\"{enc}\""));
 
     format!(
         "(\"{}\" \"{}\" ({}) {} {} {} {} {})",
@@ -99,7 +96,7 @@ fn handle_bodystructure(email: &Email) -> String {
         content_subtype,
         body_parameters
             .into_iter()
-            .map(|(k, v)| format!("(\"{}\" \"{}\")", k, v))
+            .map(|(k, v)| format!("(\"{k}\" \"{v}\")"))
             .collect::<Vec<_>>()
             .join(" "),
         content_id,
@@ -110,9 +107,9 @@ fn handle_bodystructure(email: &Email) -> String {
     )
 }
 
-fn handle_body(email: Email, b: &BodyFetchable) -> String {
+fn handle_body(email: &Email, b: &BodyFetchable) -> String {
     let (section, partial) = match b {
-        BodyFetchable::Full => return handle_bodystructure(&email),
+        BodyFetchable::Full => return handle_bodystructure(email),
         BodyFetchable::Section {
             section, partial, ..
         } => (section, partial),
@@ -120,14 +117,14 @@ fn handle_body(email: Email, b: &BodyFetchable) -> String {
 
     let data = match section {
         Section::Full => email.raw_eml.clone(),
-        Section::Msg(text) => msg_section(&email, text),
-        Section::Part { part, text } => part_section(&email, part, text),
+        Section::Msg(text) => msg_section(email, text),
+        Section::Part { part, text } => part_section(email, part, text.as_ref()),
     };
 
-    literal(&data, partial)
+    literal(&data, partial.as_ref())
 }
 
-fn literal(data: &str, partial: &Option<Partial>) -> String {
+fn literal(data: &str, partial: Option<&Partial>) -> String {
     let data = match partial {
         None => data,
         Some(Partial { start, count }) => {
@@ -149,7 +146,7 @@ fn msg_section(email: &Email, text: &SectionText) -> String {
     }
 }
 
-fn part_section(email: &Email, part: &[u32], text: &Option<SectionText>) -> String {
+fn part_section(email: &Email, part: &[u32], text: Option<&SectionText>) -> String {
     match (part, text) {
         ([1], None) => body_octets(&email.raw_eml).to_string(),
         _ => todo!(),
@@ -168,9 +165,7 @@ fn select_headers(email: &Email, names: &[String], keep: bool) -> String {
 }
 
 fn body_octets(raw: &str) -> &str {
-    raw.split_once("\r\n\r\n")
-        .map(|(_, body)| body)
-        .unwrap_or("")
+    raw.split_once("\r\n\r\n").map_or("", |(_, body)| body)
 }
 
 /// The message's INTERNALDATE as an IMAP `date-time` quoted string, e.g.
@@ -185,18 +180,15 @@ fn envelope(email: &Email) -> String {
     let sender = email
         .sender
         .as_deref()
-        .map(addrs_from_str)
-        .unwrap_or_else(|| from.clone());
+        .map_or_else(|| from.clone(), addrs_from_str);
     let reply_to = email
         .reply_to
         .as_deref()
-        .map(addrs_from_str)
-        .unwrap_or_else(|| from.clone());
+        .map_or_else(|| from.clone(), addrs_from_str);
 
     let date = email
         .sent_date
-        .map(|d| quote(&d.to_rfc2822()))
-        .unwrap_or_else(nil);
+        .map_or_else(nil, |d| quote(&d.to_rfc2822()));
     let subject = nstring(email.subject.as_deref());
     let in_reply_to = bracketed_id(email.in_reply_to.as_deref());
     let message_id = bracketed_id(email.message_id.as_deref());
@@ -375,14 +367,14 @@ body\r\n";
 
     #[test]
     fn body_text_returns_body_only() {
-        let out = handle_body(sample_email(), &section(Section::Msg(SectionText::Text)));
+        let out = handle_body(&sample_email(), &section(Section::Msg(SectionText::Text)));
         assert_eq!(out, format!("{{{}}}\r\n{BODY}", BODY.len()));
     }
 
     #[test]
     fn body_header_fields_returns_named_headers_only() {
         let out = handle_body(
-            sample_email(),
+            &sample_email(),
             &section(Section::Msg(SectionText::HeaderFields(vec![
                 "SUBJECT".into(),
             ]))),
@@ -400,7 +392,7 @@ body\r\n";
     #[test]
     fn body_header_fields_not_excludes_named_headers() {
         let out = handle_body(
-            sample_email(),
+            &sample_email(),
             &section(Section::Msg(SectionText::HeaderFieldsNot(vec![
                 "SUBJECT".into(),
             ]))),
@@ -418,7 +410,7 @@ body\r\n";
     #[test]
     fn body_numbered_part_returns_part_payload() {
         let out = handle_body(
-            sample_email(),
+            &sample_email(),
             &section(Section::Part {
                 part: vec![1],
                 text: None,
@@ -429,7 +421,7 @@ body\r\n";
 
     #[test]
     fn bare_body_renders_body_structure() {
-        let out = handle_body(sample_email(), &BodyFetchable::Full);
+        let out = handle_body(&sample_email(), &BodyFetchable::Full);
         assert!(
             out.starts_with('('),
             "expected a parenthesised body structure: {out:?}"
@@ -439,7 +431,7 @@ body\r\n";
     #[test]
     fn body_full_with_partial_truncates_to_range() {
         let out = handle_body(
-            sample_email(),
+            &sample_email(),
             &BodyFetchable::Section {
                 peek: false,
                 section: Section::Full,

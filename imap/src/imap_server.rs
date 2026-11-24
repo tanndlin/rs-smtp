@@ -15,6 +15,7 @@ pub struct IMAPServer {
 }
 
 impl IMAPServer {
+    #[allow(clippy::missing_panics_doc)]
     pub async fn new(ip: SocketAddr, db_pool: Arc<Pool<Postgres>>) -> Self {
         let listener = TcpListener::bind(ip)
             .await
@@ -32,6 +33,7 @@ impl IMAPServer {
         self.listener.local_addr()
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn start(&self) {
         loop {
             let (stream, addr) = self.listener.accept().await.unwrap();
@@ -71,13 +73,13 @@ async fn handle_request(mut stream: TcpStream, addr: SocketAddr, db_pool: Arc<Po
                     }
                 }
                 Err(e) => {
-                    eprintln!("Failed to parse command from {addr}:",);
+                    eprintln!("Failed to parse command from {addr}:");
                     let reason = match e.reason {
                         crate::response::ServerErrorReason::CommandParseError(e) => {
                             e.render(&bytes)
                         }
-                        crate::response::ServerErrorReason::ProtocolViolation(s) => s,
-                        crate::response::ServerErrorReason::Deny(s) => s,
+                        crate::response::ServerErrorReason::ProtocolViolation(s)
+                        | crate::response::ServerErrorReason::Deny(s) => s,
                     };
                     eprintln!("{reason}");
 

@@ -154,9 +154,8 @@ pub fn read_available(stream: &mut TcpStream) -> String {
     let mut buf = [0u8; 1024];
     loop {
         match stream.read(&mut buf) {
-            Ok(0) => break,
+            Ok(0) | Err(_) => break,
             Ok(n) => out.extend_from_slice(&buf[..n]),
-            Err(_) => break, // timeout: nothing more for now
         }
     }
     String::from_utf8_lossy(&out).into_owned()

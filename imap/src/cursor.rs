@@ -61,7 +61,7 @@ impl<'a> Cursor<'a> {
         if self.pos == start {
             return Err(ParseError::expected_atom(self.pos));
         }
-        Ok(str::from_utf8(&self.buf[start..self.pos]).unwrap()) // bytes are all ASCII
+        Ok(str::from_utf8(&self.buf[start..self.pos])?) // bytes are all ASCII
     }
 
     pub fn string(&mut self) -> Result<Cow<'a, str>, ParseError> {
@@ -80,15 +80,13 @@ impl<'a> Cursor<'a> {
                 .ok_or_else(|| ParseError::out_of_bytes(self.pos))?
                 != b'"'
             {
-                self.pos += 1
+                self.pos += 1;
             }
 
             let end = self.pos;
             self.eat(b'"')?;
 
-            return Ok(Cow::Borrowed(
-                str::from_utf8(&self.buf[start..end]).unwrap(),
-            ));
+            return Ok(Cow::Borrowed(str::from_utf8(&self.buf[start..end])?));
         }
 
         // B: Is length delimted
@@ -136,7 +134,7 @@ impl<'a> Cursor<'a> {
             && c.is_ascii_digit()
         {
             n *= 10;
-            n += (c - b'0') as u64;
+            n += u64::from(c - b'0');
             self.pos += 1;
         }
 
@@ -160,7 +158,7 @@ impl<'a> Cursor<'a> {
             && is_atom_char(next)
         {
             return Ok(vec![f(self)?]);
-        };
+        }
 
         self.eat(b'(')?;
 
@@ -258,7 +256,7 @@ impl<'a> Cursor<'a> {
             return Err(ParseError::expected_atom(self.pos));
         }
 
-        Ok(str::from_utf8(&self.buf[start..self.pos]).unwrap()) // bytes are all ASCII
+        Ok(str::from_utf8(&self.buf[start..self.pos])?) // bytes are all ASCII
     }
 
     /// `list-mailbox = 1*list-char / string`
@@ -286,7 +284,7 @@ impl<'a> Cursor<'a> {
             return Err(ParseError::expected_atom(self.pos));
         }
         Ok(Cow::Borrowed(
-            str::from_utf8(&self.buf[start..self.pos]).unwrap(), // bytes are all ASCII
+            str::from_utf8(&self.buf[start..self.pos])?, // bytes are all ASCII
         ))
     }
 
@@ -310,7 +308,7 @@ impl<'a> Cursor<'a> {
             .ok_or(ParseError::out_of_bytes(self.pos))?
             && next == b'*'
         {
-            self.eat(b'*').unwrap();
+            self.eat(b'*')?;
             return Ok(FetchIndicator::Wild);
         }
 

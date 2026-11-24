@@ -1,5 +1,9 @@
 use futures_lite::stream::StreamExt;
-use lapin::{Connection, ConnectionProperties, options::*, types::FieldTable};
+use lapin::{
+    Connection, ConnectionProperties,
+    options::{BasicAckOptions, BasicConsumeOptions, QueueDeclareOptions},
+    types::FieldTable,
+};
 use sqlx::{postgres::PgPoolOptions, types::chrono};
 
 use util::{Email, Mailbox};
@@ -71,8 +75,8 @@ async fn main() {
             .as_long_string()
             .unwrap()
             .to_string()
-            .split(";")
-            .map(|s| s.to_string())
+            .split(';')
+            .map(ToString::to_string)
             .collect();
         let received_at = headers
             .inner()

@@ -24,7 +24,7 @@ impl ServerErrorResponse {
     }
 
     fn tag_str(&self) -> String {
-        self.tag.to_owned().unwrap_or("*".to_string())
+        self.tag.clone().unwrap_or("*".to_string())
     }
 }
 
@@ -34,10 +34,10 @@ impl EncodeTo for ServerErrorResponse {
         match self.reason {
             ServerErrorReason::CommandParseError(_) => todo!(),
             ServerErrorReason::ProtocolViolation(reason) => {
-                buf.extend_from_slice(format!("{tag} BAD {reason}\r\n").as_bytes())
+                buf.extend_from_slice(format!("{tag} BAD {reason}\r\n").as_bytes());
             }
             ServerErrorReason::Deny(reason) => {
-                buf.extend_from_slice(format!("{tag} NO {reason}\r\n").as_bytes())
+                buf.extend_from_slice(format!("{tag} NO {reason}\r\n").as_bytes());
             }
         }
     }

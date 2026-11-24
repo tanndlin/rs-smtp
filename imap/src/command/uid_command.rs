@@ -78,6 +78,7 @@ impl Store {
         })
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn apply_to_message(&self, db_pool: Arc<Pool<Postgres>>, id: i32) -> String {
         let op = match self.operation {
             StoreOperation::Replace => "replace",
@@ -127,7 +128,7 @@ impl ClientCommandTrait for UIDCommand {
         let command = match command_text.as_str() {
             "FETCH" => {
                 let sequences = Sequence::parse_set(cursor)?;
-                let fetch_list = cursor.paren_list(|c| c.fetch_att()).unwrap_or_default();
+                let fetch_list = cursor.paren_list(Cursor::fetch_att).unwrap_or_default();
                 let fetchable = fetch_list
                     .into_iter()
                     .map(Fetchable::from_str)
@@ -195,7 +196,7 @@ mod tests {
         assert_eq!(store.flags, vec!["\\Deleted".to_string()]);
     }
 
-    /// `-FLAGS.SILENT` removes flags and suppresses the untagged FETCHes.
+    /// `-FLAGS.SILENT` removes flags and suppresses the untagged `FETCH`es.
     #[test]
     fn parses_remove_flags_silent() {
         let UIDCommandType::Store { store, .. } =
@@ -234,7 +235,7 @@ mod tests {
         };
 
         assert_eq!(store.operation, StoreOperation::Replace);
-        assert!(store.flags.is_empty());
+        assert_eq!(store.flags, [] as [String; 0]);
     }
 
     /// The flags may also come unparenthesised.
