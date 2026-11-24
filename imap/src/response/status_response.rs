@@ -69,7 +69,7 @@ impl EncodeTo for StatusResponse {
                 buf.push(b'(');
             }
 
-            buf.extend_from_slice(format!("UIDVAILIDITY {validity_uid}").as_bytes());
+            buf.extend_from_slice(format!("UIDVALIDITY {validity_uid}").as_bytes());
         }
 
         if let Some(unseen) = unseen {
