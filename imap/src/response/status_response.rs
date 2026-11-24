@@ -47,48 +47,21 @@ impl EncodeTo for StatusResponse {
             deleted,
         } = self;
 
-        buf.extend_from_slice(format!("* STATUS {mailbox} (").as_bytes());
-        if let Some(messages) = messages {
-            if *buf.last().unwrap() != b'(' {
-                buf.push(b'(');
-            }
+        let attrs = [
+            ("MESSAGES", messages),
+            ("UIDNEXT", next_uid),
+            ("UIDVALIDITY", validity_uid),
+            ("UNSEEN", unseen),
+            ("DELETED", deleted),
+        ]
+        .into_iter()
+        .filter_map(|(name, value)| value.map(|v| format!("{name} {v}")))
+        .collect::<Vec<_>>()
+        .join(" ");
 
-            buf.extend_from_slice(format!("MESSAGES {messages}").as_bytes());
-        }
-
-        if let Some(next_uid) = next_uid {
-            if *buf.last().unwrap() != b'(' {
-                buf.push(b'(');
-            }
-
-            buf.extend_from_slice(format!("UIDNEXT {next_uid}").as_bytes());
-        }
-
-        if let Some(validity_uid) = validity_uid {
-            if *buf.last().unwrap() != b'(' {
-                buf.push(b'(');
-            }
-
-            buf.extend_from_slice(format!("UIDVALIDITY {validity_uid}").as_bytes());
-        }
-
-        if let Some(unseen) = unseen {
-            if *buf.last().unwrap() != b'(' {
-                buf.push(b'(');
-            }
-
-            buf.extend_from_slice(format!("UNSEEN {unseen}").as_bytes());
-        }
-
-        if let Some(deleted) = deleted {
-            if *buf.last().unwrap() != b'(' {
-                buf.push(b'(');
-            }
-
-            buf.extend_from_slice(format!("DELETED {deleted}").as_bytes());
-        }
-
-        buf.extend_from_slice(b")\r\n");
-        buf.extend_from_slice(format!("{request_tag} OK STATUS completed\r\n").as_bytes());
+        buf.extend_from_slice(
+            format!("* STATUS {mailbox} ({attrs})\r\n{request_tag} OK STATUS completed\r\n")
+                .as_bytes(),
+        );
     }
 }
