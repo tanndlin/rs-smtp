@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::smtp::message::{ExtendedHelloMessage, HelloMessage, MailMessage, RecipientMessage};
 
 #[allow(clippy::upper_case_acronyms)]
@@ -13,10 +15,10 @@ pub enum Request {
     Quit,
 }
 
-impl TryFrom<&str> for Request {
-    type Error = String;
+impl FromStr for Request {
+    type Err = String;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let (command, rest) = value.split_once(' ').unwrap_or((value.trim(), ""));
         Ok(match command {
             "HELO" => Request::Hello(HelloMessage::from(rest)),

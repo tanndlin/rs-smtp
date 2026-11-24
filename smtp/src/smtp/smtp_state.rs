@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::smtp::{
     email::Email,
     message::{Request, Response},
@@ -169,7 +171,7 @@ impl SMTPSession {
 
         let (next, response) = match phase {
             Phase::Data(data) => self.handle_data_line(data, line),
-            phase => match Request::try_from(line) {
+            phase => match Request::from_str(line) {
                 Ok(request) => {
                     let (next, response) = phase.handle_request(request);
                     (next, Some(response))
