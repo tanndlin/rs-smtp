@@ -12,7 +12,7 @@ use crate::{
     smtp::{
         email::Email,
         message::{Ready, Response},
-        smtp_state::SMTPState,
+        smtp_state::SMTPSession,
     },
     util::line_parser::LineParser,
 };
@@ -54,7 +54,7 @@ fn handle_request(mut stream: TcpStream, addr: SocketAddr, connection: &Arc<Mute
         .open_channel(None)
         .unwrap();
 
-    let mut state = SMTPState::new(move |email| handle_mail_received(email, &channel));
+    let mut state = SMTPSession::new(move |email| handle_mail_received(email, &channel));
     let mut line_parser = LineParser::new(stream.try_clone().unwrap());
     println!("[{addr}] connected");
 
