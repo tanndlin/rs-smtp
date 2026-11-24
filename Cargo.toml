@@ -4,3 +4,9 @@ members = ["consumer", "imap", "imap_derive", "smtp", "util"]
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
+must_use_candidate = "allow"
+similar_names = "allow"
+missing_errors_doc = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
